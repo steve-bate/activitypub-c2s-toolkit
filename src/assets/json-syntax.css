@@ -1,0 +1,47 @@
+/* JSON Syntax Highlighting Styles */
+
+/* Light Mode */
+.syntax-key {
+  color: #5b21b6; /* Darker purple for keys - high contrast */
+  font-weight: 600;
+}
+
+.syntax-string {
+  color: #065f46; /* Dark teal/green for strings - high contrast */
+}
+
+.syntax-number {
+  color: #064e3b; /* Dark teal for numbers - high contrast */
+}
+
+.syntax-boolean {
+  color: #b45309; /* Dark orange for booleans - high contrast */
+}
+
+.syntax-null {
+  color: #4b5563; /* Dark gray for null - high contrast */
+  font-style: italic;
+}
+
+/* Dark Mode */
+.dark .syntax-key {
+  color: #f472b6; /* Bright pink for keys in dark mode */
+  font-weight: 600;
+}
+
+.dark .syntax-string {
+  color: #34d399; /* Bright emerald for strings in dark mode */
+}
+
+.dark .syntax-number {
+  color: #22d3ee; /* Bright cyan for numbers in dark mode */
+}
+
+.dark .syntax-boolean {
+  color: #fb923c; /* Bright orange for booleans in dark mode */
+}
+
+.dark .syntax-null {
+  color: #a1a1aa; /* Light gray for null in dark mode */
+  font-style: italic;
+}
