@@ -178,7 +178,7 @@ async function discoverMastodonEndpoints(serverInfo: ServerInfo): Promise<Discov
     console.debug(`Mastodon API discovery failed for ${serverInfo.hostname}:`, error)
     return {
       success: false,
-      error: error?.message || 'Mastodon-compatible discovery failed',
+      error: error instanceof Error ? error?.message : 'Mastodon-compatible discovery failed',
       serverInfo
     }
   }

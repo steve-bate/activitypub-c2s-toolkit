@@ -285,15 +285,15 @@ async function handleRefreshToken() {
       server.value.oauth2
     )
 
-    if (result.success && result.tokenResponse) {
-      serverStore.saveTokenResponse(server.value.id, result.tokenResponse, result.tokenRequest)
+    if (result.success && result.response) {
+      serverStore.saveTokenResponse(server.value.id, result.response, result.request)
       
       // Discover actor information after token refresh
       try {
         const actorResult = await getActor(
-          result.tokenResponse,
+          result.response,
           server.value.authorizationServer.metadata,
-          result.tokenResponse.access_token,
+          result.response.access_token,
           server.value.oauth2.clientId,
           server.value.oauth2.clientSecret
         )

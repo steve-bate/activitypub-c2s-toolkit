@@ -6,7 +6,7 @@
  * 3. Mastodon /api/v1/verify_credentials
  */
 
-import { TokenResponse } from '@/stores/serverStore'
+import { TokenResponsePayload } from './authorizationService'
 import type { AuthorizationServerMetadata } from './authServerMetadataService'
 import { tryDecodeJWT } from '@/utils/jwt'
 
@@ -46,7 +46,7 @@ export interface ActorDiscoveryResult {
 /**
  * Method 1: Extract actor URI from token response "me" property
  */
-function getActorFromTokenResponse(tokenResponse: TokenResponse): Actor | null {
+function getActorFromTokenResponse(tokenResponse: TokenResponsePayload): Actor | null {
   if (tokenResponse?.me) {
     return {
       uri: tokenResponse.me,
@@ -200,7 +200,7 @@ async function fetchActorInfo(actorUri: string, accessToken?: string): Promise<{
       }
     }
   } catch (error) {
-    const errorMessage = `Error fetching actor profile: ${error?.message || 'Unknown error'}`
+    const errorMessage = `Error fetching actor profile: ${error instanceof Error ? error.message : 'Unknown error'}`
     console.debug(`${errorMessage} from ${actorUri}:`, error)
     return { success: false, error: errorMessage }
   }
@@ -210,7 +210,7 @@ async function fetchActorInfo(actorUri: string, accessToken?: string): Promise<{
  * Discover actor information using multiple methods
  */
 export async function discoverActor(
-  tokenResponse: TokenResponse,
+  tokenResponse: TokenResponsePayload,
   metadata: AuthorizationServerMetadata,
   accessToken: string,
   clientId: string,

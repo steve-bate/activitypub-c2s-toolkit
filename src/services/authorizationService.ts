@@ -5,7 +5,7 @@
  */
 
 import type { AuthorizationServerMetadata } from './authServerMetadataService'
-import type { OAuth2Config, TokenResponse } from '@/stores/serverStore'
+import type { OAuth2Config } from '@/stores/serverStore'
 
 export interface AuthorizationOptions {
   serverId: string
@@ -21,18 +21,56 @@ export interface TokenExchangeOptions {
   oauth2Config: OAuth2Config
 }
 
-export interface TokenExchangeRequest {
+export interface HttpRequestData<TParams = unknown> {
+  url: string
+  headers: Record<string, string>
+  params: TParams
+  timestamp?: string
+}
+
+export interface HttpResponseData<TParams = unknown> {
+  status_code: number
+  headers: Record<string, string>
+  payload: TParams
+}
+
+export interface HttpExchange<TRequest = unknown, TResponse = unknown> {
+  success: boolean
+  error?: string
+  request?: TRequest
+  response?: TResponse
+}
+
+export interface TokenExchangeParams {
+  grant_type: string;
+  redirect_uri: string;
+  client_id: string;
+  code: string;
+  code_verifier?: string;
+}
+
+export interface TokenResponsePayload {
+  access_token: string
+  refresh_token?: string
+  expires_in?: number
+  token_type?: string
+  scope?: string
+  me?: string 
+}
+
+export type TokenExchangeRequest = HttpRequestData<TokenExchangeParams>
+export type TokenExchangeResponse = HttpResponseData<TokenResponsePayload>
+export type TokenExchangeHttpExchange = HttpExchange<TokenExchangeRequest, TokenExchangeResponse>
+
+export interface TokenRefreshParams {
   grant_type: string;
   refresh_token: string;
   client_id: string;
 }
 
-export interface TokenExchangeResult {
-  success: boolean
-  tokenResponse?: TokenResponse
-  tokenRequest?: object
-  error?: string
-}
+
+// TODO make this generic
+export type TokenRefreshRequest = HttpRequestData<TokenRefreshParams>
 
 /**
  * Generate a cryptographically secure random string for PKCE code verifier
@@ -228,7 +266,7 @@ export function validateState(serverId: string, receivedState: string): boolean 
  */
 export async function exchangeCodeForToken(
   options: TokenExchangeOptions
-): Promise<TokenExchangeResult> {
+): Promise<TokenExchangeHttpExchange> {
   const { serverId, authCode, serverMetadata, oauth2Config } = options
   
   console.debug(`Exchanging authorization code for access token (server ${serverId})`)
@@ -251,24 +289,24 @@ export async function exchangeCodeForToken(
   const pkceParams = retrievePKCEParameters(serverId)
   
   // Build token request parameters
-  const tokenRequest = {
+  const tokenRequestParams: TokenExchangeParams = {
     grant_type: 'authorization_code',
     code: authCode,
     redirect_uri: oauth2Config.redirectUri,
     client_id: oauth2Config.clientId,
-    code_verifier: null
+    code_verifier: undefined
   }
   
   // Add PKCE code verifier if available
   if (pkceParams?.codeVerifier) {
-    tokenRequest.code_verifier = pkceParams.codeVerifier
+    tokenRequestParams.code_verifier = pkceParams.codeVerifier
     console.debug('Including PKCE code_verifier in token request')
   }
   
   // Convert to URLSearchParams for form encoding
   const tokenParams = new URLSearchParams()
-  Object.keys(tokenRequest).forEach(key => {
-    tokenParams.append(key, tokenRequest[key])
+  Object.keys(tokenRequestParams).forEach(key => {
+    tokenParams.append(key, tokenRequestParams[key as keyof TokenExchangeParams] as string)
   })
   
   // Prepare request headers
@@ -288,6 +326,8 @@ export async function exchangeCodeForToken(
     console.debug('Using public client authentication (no client_secret)')
   }
   
+  const timestamp = new Date().toISOString()
+
   try {
     const response = await fetch(serverMetadata.links.oauth_token, {
       method: 'POST',
@@ -317,7 +357,7 @@ export async function exchangeCodeForToken(
       }
     }
     
-    const tokenResponse: TokenResponse = await response.json()
+    const tokenResponse: TokenResponsePayload = await response.json()
     
     console.debug('Token exchange successful')
     
@@ -326,14 +366,23 @@ export async function exchangeCodeForToken(
     
     return {
       success: true,
-      tokenResponse,
-      tokenRequest
+      response: {
+        status_code: response.status,
+        headers: Object.fromEntries(response.headers.entries()),
+        payload: tokenResponse,
+      },
+      request: {
+        params: tokenRequestParams,
+        url: serverMetadata.links.oauth_token,
+        headers,
+        timestamp
+      }
     }
   } catch (error) {
     console.error('Token exchange error:', error)
     return {
       success: false,
-      error: error?.message || 'Network error during token exchange'
+      error: error instanceof Error ? error.message : 'Network error during token exchange'
     }
   }
 }
@@ -352,7 +401,7 @@ export async function refreshAccessToken(
   refreshToken: string,
   serverMetadata: AuthorizationServerMetadata,
   oauth2Config: OAuth2Config
-): Promise<TokenExchangeResult> {
+): Promise<HttpExchange<TokenRefreshRequest, TokenResponsePayload>> {
   console.debug(`Refreshing access token for server ${serverId}`)
   
   if (!serverMetadata.links.oauth_token) {
@@ -370,7 +419,7 @@ export async function refreshAccessToken(
   }
   
   // Build token request parameters
-  const tokenRequest: TokenExchangeRequest = {
+  const tokenRefreshParams: TokenRefreshParams = {
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
     client_id: oauth2Config.clientId
@@ -378,8 +427,8 @@ export async function refreshAccessToken(
   
   // Convert to URLSearchParams for form encoding
   const tokenParams = new URLSearchParams()
-  Object.keys(tokenRequest).forEach(key => {
-    tokenParams.append(key, tokenRequest[key])
+  Object.keys(tokenRefreshParams).forEach(key => {
+    tokenParams.append(key, tokenRefreshParams[key as keyof TokenRefreshParams])
   })
   
   // Prepare request headers
@@ -423,20 +472,24 @@ export async function refreshAccessToken(
       }
     }
     
-    const tokenResponse: TokenResponse = await response.json()
+    const tokenResponse: TokenResponsePayload = await response.json()
     
     console.debug('Token refresh successful')
     
     return {
       success: true,
-      tokenResponse,
-      tokenRequest
+      response: tokenResponse,
+      request: {
+        url: serverMetadata.links.oauth_token,
+        headers,
+        params: tokenRefreshParams
+      }
     }
   } catch (error) {
     console.error('Token refresh error:', error)
     return {
       success: false,
-      error: error?.message || 'Network error during token refresh'
+      error: error instanceof Error ? error.message : 'Network error during token refresh'
     }
   }
 }
@@ -513,7 +566,7 @@ export async function revokeToken(
     console.error('Token revocation error:', error)
     return {
       success: false,
-      error: error?.message || 'Network error during token revocation'
+      error: error instanceof Error ? error.message : 'Network error during token revocation'
     }
   }
 }

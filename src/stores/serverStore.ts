@@ -4,6 +4,7 @@ import type { AuthorizationServerMetadata } from '@/services/authServerMetadataS
 import type { Actor } from '@/services/actorDiscoveryService'
 import type { NodeInfo, NodeInfoIndex } from '@/services/nodeinfoService'
 import type { WebFingerData } from '@/services/webfingerService'
+import { TokenExchangeHttpExchange, TokenResponsePayload } from '@/services/authorizationService'
 
 export type { AuthorizationServerMetadata as ServerMetadata, Actor, NodeInfo, NodeInfoIndex, WebFingerData as WebFingerResponse }
 
@@ -34,12 +35,6 @@ export interface RegistrationExchange {
   responseRaw?: string
 }
 
-export interface TokenExchange {
-  request: object
-  response: object
-  timestamp: string
-}
-
 export interface OAuth2Config {
   clientId: string
   clientSecret: string
@@ -48,15 +43,6 @@ export interface OAuth2Config {
   registrationMethod?: RegistrationMethod
   registrationExchange?: RegistrationExchange
   registrationError?: string
-}
-
-export interface TokenResponse {
-  access_token: string
-  refresh_token?: string
-  expires_in?: number
-  token_type?: string
-  scope?: string
-  me?: string 
 }
 
 export interface AuthorizationServerInfo {
@@ -86,8 +72,8 @@ export interface ResourceServerMetadata {
   oauth2: OAuth2Config
   authorizationServer: AuthorizationServerInfo
   authCode: string | null
-  tokenResponse: TokenResponse | null
-  tokenExchange?: TokenExchange
+  tokenResponse: TokenResponsePayload | null
+  tokenExchange?: TokenExchangeHttpExchange
   actor?: Actor
   actorError?: string
   nodeinfo?: NodeInfo
@@ -210,17 +196,21 @@ export const useServerStore = defineStore('server', () => {
   /**
    * Update nested server properties
    */
-  function updateServerProperty(id: string, property: keyof ResourceServerMetadata, value: unknown): ResourceServerMetadata | null {
+  function updateServerProperty<K extends keyof ResourceServerMetadata>(
+    id: string, 
+    property: K, 
+    value: ResourceServerMetadata[K]
+  ): ResourceServerMetadata | null {
     const index = servers.value.findIndex(s => s.id === id)
     if (index !== -1) {
       const server = servers.value[index]
       const currentValue = server[property]
-      if (typeof currentValue === 'object' && currentValue !== null) {
+      if (typeof currentValue === 'object' && currentValue !== null && typeof value === 'object' && value !== null) {
         // Update object properties by merging
-        ;(server as object)[property] = { ...currentValue, ...(value as object) }
+        server[property] = { ...currentValue, ...value } as ResourceServerMetadata[K]
       } else {
         // Direct assignment for primitive values
-        ;(server as object)[property] = value
+        server[property] = value
       }
       persistServers()
       return servers.value[index]
@@ -325,14 +315,10 @@ export const useServerStore = defineStore('server', () => {
   /**
    * Save token exchange response
    */
-  function saveTokenResponse(serverId: string, tokenResponse: TokenResponse, tokenRequest?: object): ResourceServerMetadata | null {
-    updateServerProperty(serverId, 'tokenResponse', tokenResponse)
-    if (tokenRequest) {
-      updateServerProperty(serverId, 'tokenExchange', {
-        request: tokenRequest,
-        response: tokenResponse,
-        timestamp: new Date().toISOString()
-      })
+  function saveTokenExchange(serverId: string, tokenExchange: TokenExchangeHttpExchange): ResourceServerMetadata | null {
+    updateServerProperty(serverId, 'tokenResponse', tokenExchange.response?.payload ?? null)
+    if (tokenExchange.request) {
+      updateServerProperty(serverId, 'tokenExchange', tokenExchange)
     }
     return updateServer(serverId, { 
       authStatus: 'authorized',
@@ -499,7 +485,7 @@ export const useServerStore = defineStore('server', () => {
     saveDiscoveryMetadata,
     saveDiscoveryError,
     saveAuthCode,
-    saveTokenResponse,
+    saveTokenResponse: saveTokenExchange,
     saveActorInfo,
     saveActorError,
     saveBearerToken,

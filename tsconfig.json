@@ -15,11 +15,11 @@
     "jsx": "preserve",
 
     /* Linting - relaxed for gradual migration */
-    "strict": false,
-    "noUnusedLocals": false,
-    "noUnusedParameters": false,
+    "strict": true,
+    "noUnusedLocals": true,
+    "noUnusedParameters": true,
     "noFallthroughCasesInSwitch": true,
-    "noImplicitAny": false,
+    "noImplicitAny": true,
 
     /* Path mapping */
     "baseUrl": ".",

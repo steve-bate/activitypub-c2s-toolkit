@@ -171,7 +171,7 @@ export async function registerClient(
     }
 
     const responseText = await response.text()
-    let data: ClientRegistrationData = undefined;
+    let data: ClientRegistrationData | undefined = undefined;
     try {
       data = JSON.parse(responseText)
     } catch {
@@ -195,7 +195,7 @@ export async function registerClient(
     console.error('Client registration error:', error)
     return {
       success: false,
-      error: error?.message || 'Network error during client registration',
+      error: error instanceof Error ? error?.message : 'Network error during client registration',
       requestHeaders: {
         'Content-Type': 'application/json',
         'Accept': 'application/json'

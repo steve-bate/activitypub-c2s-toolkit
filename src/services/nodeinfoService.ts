@@ -160,7 +160,7 @@ async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexResult>
     console.debug('NodeInfo index fetch error:', error)
     return {
       status: 'error',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }
@@ -252,7 +252,7 @@ async function fetchNodeInfo(url: string): Promise<NodeInfoDataResponse> {
     console.debug('NodeInfo fetch error:', error)
     return {
       status: 'error',
-      error: error.message
+      error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
 }

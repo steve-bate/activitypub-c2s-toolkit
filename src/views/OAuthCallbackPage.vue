@@ -60,25 +60,25 @@ onMounted(async () => {
     message.value = 'Exchanging authorization code for access token...'
 
     // Exchange authorization code for access token
-    const result = await exchangeCodeForToken({
+    const exchange = await exchangeCodeForToken({
       serverId,
       authCode: callback.code,
       serverMetadata: server.authorizationServer.metadata,
       oauth2Config: server.oauth2
     })
 
-    if (result.success && result.tokenResponse) {
+    if (exchange.success && exchange.response) {
       // Save token response to store
-      serverStore.saveTokenResponse(serverId, result.tokenResponse, result.tokenRequest)
+      serverStore.saveTokenResponse(serverId, exchange)
       serverStore.saveAuthCode(serverId, callback.code)
       
       // Discover actor information
       message.value = 'Discovering actor information...'
       try {
         const actorResult = await discoverActor(
-          result.tokenResponse,
+          exchange.response,
           server.authorizationServer.metadata,
-          result.tokenResponse.access_token,
+          exchange.response.payload.access_token,
           server.oauth2.clientId,
           server.oauth2.clientSecret
         )
@@ -110,12 +110,12 @@ onMounted(async () => {
     } else {
       status.value = 'error'
       message.value = 'Token exchange failed'
-      errorDetails.value = result.error || 'Unknown error occurred during token exchange'
+      errorDetails.value = exchange.error || 'Unknown error occurred during token exchange'
     }
   } catch (error) {
     status.value = 'error'
     message.value = 'An error occurred'
-    errorDetails.value = error?.message || 'Unexpected error during OAuth callback processing'
+    errorDetails.value = error instanceof Error ? error.message : 'Unexpected error during OAuth callback processing'
     console.error('OAuth callback error:', error)
   }
 })

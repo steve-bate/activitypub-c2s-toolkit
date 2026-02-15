@@ -26,7 +26,7 @@ let timerInterval: ReturnType<typeof setInterval> | null = null
 const tokenExpiresIn = computed(() => {
   if (!props.server.tokenResponse?.expires_in) return null
 
-  const createdAt = props.server.tokenExchange?.timestamp
+  const createdAt = props.server.tokenExchange?.request?.timestamp
 
   if (!createdAt) {
     return formatExpirationTime(props.server.tokenResponse.expires_in)
@@ -180,23 +180,23 @@ onUnmounted(() => {
           </div>
         </summary>
         <div class="mt-4 space-y-4">
-          <!-- Token Exchange Request Panel -->
           <HttpRequestPanel
             title="Request"
+            :url="server.tokenExchange.request.url"
+            :headers="server.tokenExchange.request.headers"
             :payload="server.tokenExchange.request"
             content-type="application/x-www-form-urlencoded"
           />
-
-          <!-- Token Exchange Response Panel -->
           <HttpResponsePanel
             title="Response"
+            :status="server.tokenExchange.response?.status_code"
+            :headers="server.tokenExchange.response?.headers"
             :payload="server.tokenResponse"
             content-type="application/json"
           />
-
           <!-- Timestamp -->
-          <div v-if="server.tokenExchange?.timestamp" class="text-xs text-gray-500 dark:text-gray-400">
-            Token exchanged: {{ new Date(server.tokenExchange.timestamp).toLocaleString() }}
+          <div v-if="server.tokenExchange?.request?.timestamp" class="text-xs text-gray-500 dark:text-gray-400">
+            Token exchanged: {{ new Date(server.tokenExchange.request.timestamp).toLocaleString() }}
           </div>
         </div>
       </details>

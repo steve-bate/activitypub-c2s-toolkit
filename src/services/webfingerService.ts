@@ -171,7 +171,7 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
     console.debug('WebFinger fetch error:', error)
     return {
       success: false,
-      error: error.message || 'Network error during WebFinger lookup'
+      error: error instanceof Error ? error.message : 'Network error during WebFinger lookup'
     }
   }
 }
@@ -180,9 +180,9 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
  * Extract ActivityPub actor URI from WebFinger links
  * Looks for link with rel="self" and type="application/activity+json"
  */
-function extractActorUri(webfinger: WebFingerData): string | null {
+function extractActorUri(webfinger: WebFingerData): string | undefined {
   if (!webfinger.links || webfinger.links.length === 0) {
-    return null
+    return undefined
   }
   
   // Look for ActivityPub profile link
@@ -202,7 +202,7 @@ function extractActorUri(webfinger: WebFingerData): string | null {
     link.href
   )
   
-  return fallbackLink?.href || null
+  return fallbackLink?.href || undefined
 }
 
 /**
