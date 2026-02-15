@@ -47,7 +47,7 @@ export interface ActorDiscoveryResult {
  * Method 1: Extract actor URI from token response "me" property
  */
 function getActorFromTokenResponse(tokenResponse: TokenResponsePayload): Actor | null {
-  if (tokenResponse?.me) {
+  if (tokenResponse.me) {
     return {
       uri: tokenResponse.me,
       discoveryMethod: 'token_response'

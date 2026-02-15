@@ -76,7 +76,7 @@ onMounted(async () => {
       message.value = 'Discovering actor information...'
       try {
         const actorResult = await discoverActor(
-          exchange.response,
+          exchange.response.payload,
           server.authorizationServer.metadata,
           exchange.response.payload.access_token,
           server.oauth2.clientId,
