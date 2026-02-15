@@ -8,7 +8,7 @@ const serverStore = useServerStore()
 
 function handleAddServer() {
   console.log('STUB: Add new server')
-  router.push('/servers/new')
+  void router.push('/servers/new')
 }
 </script>
 

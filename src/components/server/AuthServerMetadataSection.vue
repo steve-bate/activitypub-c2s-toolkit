@@ -20,7 +20,7 @@ const isDiscovering = ref(false)
 const discoveryError = ref<string | null>(null)
 
 function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text)
+ void  navigator.clipboard.writeText(text)
 }
 
 const highlightedJson = computed(() => {
@@ -59,7 +59,7 @@ async function handleRefreshMetadata() {
       discoveryError.value = result.error || 'Discovery failed'
     }
   } catch (error) {
-    discoveryError.value = error?.message || 'Unexpected error during discovery'
+    discoveryError.value = (error instanceof Error ? error.message : 'Unexpected error during discovery')
   } finally {
     isDiscovering.value = false
   }

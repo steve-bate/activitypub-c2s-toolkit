@@ -7,13 +7,13 @@ const router = useRouter()
 const serverStore = useServerStore()
 const isOpen = ref(false)
 
-function selectServer(serverId) {
+function selectServer(serverId: string) {
   serverStore.setActiveServer(serverId)
   isOpen.value = false
 }
 
 function goToManageServers() {
-  router.push('/servers')
+  void router.push('/servers')
   isOpen.value = false
 }
 </script>

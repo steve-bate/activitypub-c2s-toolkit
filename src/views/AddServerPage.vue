@@ -150,7 +150,7 @@ async function createServerWithMetadata(
       serverStore.setActiveServer(newServer.id)
       
       setTimeout(() => {
-        router.push(`/servers/${newServer.id}`)
+        void router.push(`/servers/${newServer.id}`)
       }, 1000)
     } catch (error) {
       console.error('Client registration error:', error)
@@ -167,7 +167,7 @@ async function createServerWithMetadata(
   serverStore.setActiveServer(newServer.id)
   
   setTimeout(() => {
-    router.push(`/servers/${newServer.id}`)
+    void router.push(`/servers/${newServer.id}`)
   }, 1000)
 }
 
@@ -198,7 +198,7 @@ function handleBearerTokenSave(formData: { identifier: string; name: string; bea
   serverStore.setActiveServer(newServer.id)
 
   setTimeout(() => {
-    router.push(`/servers/${newServer.id}`)
+    void router.push(`/servers/${newServer.id}`)
   }, 1000)
 }
 
@@ -232,7 +232,7 @@ function handleFormSave(formData) {
   serverStore.setActiveServer(newServer.id)
   
   setTimeout(() => {
-    router.push(`/servers/${newServer.id}`)
+    void router.push(`/servers/${newServer.id}`)
   }, 1000)
 }
 
@@ -240,7 +240,7 @@ function handleFormSave(formData) {
  * Handle cancel
  */
 function handleFormCancel() {
-  router.push('/servers')
+  void router.push('/servers')
 }
 
 /**

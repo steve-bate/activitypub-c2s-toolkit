@@ -18,7 +18,7 @@ const props = withDefaults(defineProps<Props>(), {
   headers: null,
   url: null,
   queryParams: null,
-  payload: null,
+  payload: undefined,
   contentType: null
 })
 
@@ -60,7 +60,7 @@ const payloadLabel = computed(() => {
 })
 
 const highlightedJson = computed(() => {
-  if (!isJsonPayload.value) return ''
+  if (!isJsonPayload.value || !props.payload) return ''
   return syntaxHighlightJson(formatJson(props.payload as object))
 })
 
@@ -92,7 +92,7 @@ const formattedForm = computed(() => {
     const params = new URLSearchParams()
     Object.entries(props.payload as Record<string, unknown>).forEach(([key, value]) => {
       if (value === undefined || value === null) return
-      params.append(key, String(value))
+      params.append(key, JSON.stringify(value))
     })
     return params.toString()
   }

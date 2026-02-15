@@ -36,7 +36,7 @@ async function handleMenuClick(item: string) {
   sendActivitySubmenuOpen.value = false
   
   if (item === 'create') {
-    router.push({ path: '/post' })
+    void router.push({ path: '/post' })
     return
   }
   
@@ -47,7 +47,7 @@ async function handleMenuClick(item: string) {
   
   if (!props.actor) return
   
-  let uri: string | null = null
+  let uri: string | undefined = undefined
   
   switch (item) {
     case 'actor':
@@ -99,7 +99,7 @@ async function handleMenuClick(item: string) {
     console.log(`Fetched ${item}:`, document)
 
     // Navigate to JSON browser page with the URI and document
-    router.push({ 
+    void router.push({ 
       path: '/json', 
       query: { uri }
     })

@@ -1,15 +1,15 @@
 <script setup lang="ts">
-import { useServerStore } from '@/stores/serverStore'
+import { ResourceServerMetadata, useServerStore } from '@/stores/serverStore'
 
 const serverStore = useServerStore()
 
-function handleDelete(server) {
+function handleDelete(server: ResourceServerMetadata) {
   if (confirm(`Delete server "${server.name}"?`)) {
     serverStore.deleteServer(server.id)
   }
 }
 
-function formatAuthStatus(status) {
+function formatAuthStatus(status: string): string {
   switch (status) {
     case 'authorized':
       return 'Authorized'
@@ -20,7 +20,7 @@ function formatAuthStatus(status) {
   }
 }
 
-function formatLastUsed(dateString) {
+function formatLastUsed(dateString: string | null): string {
   if (!dateString) return '—'
   const date = new Date(dateString)
   return date.toLocaleString()

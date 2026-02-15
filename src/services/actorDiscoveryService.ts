@@ -69,12 +69,17 @@ async function introspectToken(
   try {
     console.debug('Attempting RFC 7662 token introspection')
     
+    const requestHeaders: HeadersInit = {
+        'Content-Type': 'application/x-www-form-urlencoded',
+    }
+
+    if (clientSecret) {
+      requestHeaders['Authorization'] = `Basic ${btoa(`${clientId}:${clientSecret}`)}`
+    }
+      
     const response = await fetch(introspectionEndpoint, {
       method: 'POST',
-      headers: {
-        'Content-Type': 'application/x-www-form-urlencoded',
-        'Authorization': `Basic ${btoa(`${clientId}:${clientSecret}`)}`
-      },
+      headers: requestHeaders,
       body: new URLSearchParams({
         token: accessToken,
         token_type_hint: 'access_token'

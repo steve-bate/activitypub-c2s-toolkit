@@ -35,12 +35,12 @@ onMounted(() => {
     // Automatically load NodeInfo if not already loaded
     const serverValue = server.value
     if (serverValue && !serverValue.nodeinfo && !serverValue.nodeinfoError && !isLoadingNodeInfo.value) {
-      handleLoadNodeInfo()
+      void handleLoadNodeInfo()
     }
     
     // Start automatic authorization flow only for newly added servers
     if (serverValue && serverStore.consumeAutoAuthForServer(serverValue.id)) {
-      handleAutomaticAuthFlow()
+      void handleAutomaticAuthFlow()
     }
   }
 })
@@ -53,7 +53,7 @@ watch(
     // Only navigate if we're on ServerDetailPage and the activeServerId changed
     // and it's different from the current page's serverId
     if (newActiveId && serverId.value && newActiveId !== serverId.value && route.name === 'server-detail') {
-      router.push(`/servers/${newActiveId}`)
+      void router.push(`/servers/${newActiveId}`)
     }
   }
 )
@@ -63,12 +63,12 @@ watch(
   () => server.value,
   (newServer) => {
     if (newServer && !newServer.nodeinfo && !newServer.nodeinfoError && !isLoadingNodeInfo.value) {
-      handleLoadNodeInfo()
+      void handleLoadNodeInfo()
     }
     
     // Start automatic authorization flow only for newly added servers
     if (newServer && serverStore.consumeAutoAuthForServer(newServer.id)) {
-      handleAutomaticAuthFlow()
+      void handleAutomaticAuthFlow()
     }
   }
 )
@@ -80,7 +80,7 @@ function handleDeleteServer() {
   if (server.value && confirm(`Are you sure you want to delete "${server.value.name}"?`)) {
     if (!serverId.value) return
     serverStore.deleteServer(serverId.value)
-    router.push('/servers')
+    void router.push('/servers')
   }
 }
 
@@ -155,7 +155,7 @@ async function handleAutoDiscoverMetadata() {
       serverStore.setAuthStatus(server.value.id, 'configured')
       
       // Continue to next step
-      setTimeout(() => handleAutomaticAuthFlow(), 500)
+      setTimeout(() => void handleAutomaticAuthFlow(), 500)
     }
   } catch (error) {
     console.warn('Auto-discovery failed:', error)
@@ -202,18 +202,13 @@ async function handleAutoRegisterClient() {
         scopes: ''
       }
       
-      serverStore.updateServerProperty(server.value.id, 'oauth2', {
-        ...oauth2Config,
-        registrationExchange: {
-          request: result.requestData,
-          response: result.data || { error: result.error },
-          timestamp: new Date().toISOString(),
-          requestHeaders: result.requestHeaders,
-          requestUrl: result.requestUrl,
-          httpMeta: result.httpMeta,
-          responseRaw: result.responseRaw
-        }
-      })
+      // Store error if registration failed
+      if (!result.success) {
+        serverStore.updateServerProperty(server.value.id, 'oauth2', {
+          ...oauth2Config,
+          registrationError: result.error || 'Registration failed'
+        })
+      }
     }
     
     if (result.success && result.data) {
@@ -227,13 +222,7 @@ async function handleAutoRegisterClient() {
       })
       
       // Continue to next step
-      setTimeout(() => handleAutomaticAuthFlow(), 500)
-    } else if (result.error) {
-      // Set error message for failed registration
-      serverStore.updateServerProperty(server.value.id, 'oauth2', {
-        ...(server.value.oauth2 || {}),
-        registrationError: result.error || 'Registration failed'
-      })
+      setTimeout(() => void handleAutomaticAuthFlow(), 500)
     }
   } catch (error) {
     console.warn('Auto-registration failed:', error)
@@ -286,7 +275,7 @@ async function handleRefreshToken() {
     )
 
     if (result.success && result.response) {
-      serverStore.saveTokenResponse(server.value.id, result.response, result.request)
+      serverStore.updateServerProperty(server.value.id, 'tokenResponse', result.response)
       
       // Discover actor information after token refresh
       try {
@@ -313,7 +302,7 @@ async function handleRefreshToken() {
       tokenError.value = result.error || 'Token refresh failed'
     }
   } catch (error) {
-    tokenError.value = error?.message || 'Unexpected error during token refresh'
+    tokenError.value = error instanceof Error ? error.message : 'Unexpected error during token refresh'
   } finally {
     isRefreshing.value = false
   }
@@ -348,12 +337,12 @@ async function handleDiscoverActor() {
     } else {
       const errorMessage = actorResult.error || 'Actor discovery failed'
       actorError.value = errorMessage;
-      serverStore.saveActorError(server.value.id, actorError.value)
+      serverStore.saveActorError(server.value.id, errorMessage)
     }
   } catch (error) {
-    const errorMessage = error?.message || 'Unexpected error during actor discovery'
+    const errorMessage = error instanceof Error ? error.message : 'Unexpected error during actor discovery'
     actorError.value = errorMessage;
-    serverStore.saveActorError(server.value.id, actorError.value)
+    serverStore.saveActorError(server.value.id, errorMessage)
   } finally {
     isRefreshingActor.value = false
   }
@@ -392,7 +381,7 @@ async function handleRefreshActor() {
       serverStore.saveActorError(server.value.id, actorError.value)
     }
   } catch (error) {
-    const errorMessage = error?.message || 'Unexpected error during actor discovery'
+    const errorMessage = error instanceof Error ? error.message : 'Unexpected error during actor discovery'
     actorError.value = errorMessage;
     serverStore.saveActorError(server.value.id, errorMessage)
   } finally {
@@ -444,7 +433,7 @@ async function handleLoadNodeInfo() {
       serverStore.saveNodeInfoError(server.value.id, errorMessage)
     }
   } catch (error) {
-    const errorMessage = error?.message || 'Unexpected error loading NodeInfo'
+    const errorMessage = error instanceof Error ? error.message : 'Unexpected error loading NodeInfo'
     nodeinfoError.value = errorMessage
     serverStore.saveNodeInfoError(server.value.id, errorMessage)
   } finally {
@@ -492,7 +481,7 @@ async function handleRefreshNodeInfo() {
       serverStore.saveNodeInfoError(server.value.id, errorMessage)
     }
   } catch (error) {
-    const errorMessage = error?.message || 'Unexpected error refreshing NodeInfo'
+    const errorMessage = error instanceof Error ? error.message : 'Unexpected error refreshing NodeInfo'
     nodeinfoError.value = errorMessage
     serverStore.saveNodeInfoError(server.value.id, errorMessage)
   } finally {
@@ -534,7 +523,7 @@ async function handleRevokeToken() {
       tokenError.value = result.error || 'Token revocation failed'
     }
   } catch (error) {
-    tokenError.value = error?.message || 'Unexpected error during token revocation'
+    tokenError.value = error instanceof Error ? error.message : 'Unexpected error during token revocation'
   } finally {
     isRevoking.value = false
   }

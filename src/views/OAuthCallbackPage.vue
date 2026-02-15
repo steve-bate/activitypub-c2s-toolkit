@@ -105,7 +105,7 @@ onMounted(async () => {
       
       // Redirect to server detail page after a short delay
       setTimeout(() => {
-        router.push(`/servers/${serverId}`)
+        void router.push(`/servers/${serverId}`)
       }, 1500)
     } else {
       status.value = 'error'
@@ -124,9 +124,9 @@ function handleRetry() {
   const serverId = sessionStorage.getItem('oauth_current_server_id')
   if (serverId) {
     serverStore.setActiveServer(serverId)
-    router.push(`/servers/${serverId}`)
+    void router.push(`/servers/${serverId}`)
   } else {
-    router.push('/servers')
+    void router.push('/servers')
   }
 }
 </script>

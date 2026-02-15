@@ -1,43 +1,34 @@
 // @ts-check
-import eslint from '@eslint/js';
-import tseslint from 'typescript-eslint';
 import pluginVue from 'eslint-plugin-vue';
-import vueParser from 'vue-eslint-parser';
 import globals from 'globals';
+import {
+  defineConfigWithVueTs,
+  vueTsConfigs,
+} from '@vue/eslint-config-typescript';
 
-export default tseslint.config(
+export default defineConfigWithVueTs(
   // Ignore build outputs and dependencies
   {
     ignores: ['**/node_modules/**', '**/dist/**', '**/.vite/**'],
   },
 
-  // Base JS + TS
-  eslint.configs.recommended,
-  ...tseslint.configs.recommended,
+  // Vue 3 essential rules
+  pluginVue.configs['flat/essential'],
 
-  // Vue rules (flat)
-  ...pluginVue.configs['flat/recommended'],
+  // Official Vue+TS recommended config (type-checked)
+  vueTsConfigs.recommendedTypeChecked,
 
-  // Tell ESLint how to parse TS (incl. in .vue files)
+  // Project-specific tweaks
   {
-    files: ['**/*.vue'],
     languageOptions: {
-      parser: vueParser,
-      parserOptions: {
-        parser: tseslint.parser,
-        ecmaVersion: 'latest',
-        sourceType: 'module',
-        extraFileExtensions: ['.vue'],
-      },
       globals: {
         ...globals.browser,
+        ...globals.node,
         ...globals.es2021,
       },
     },
     rules: {
-      // Types are handled by TypeScript; avoid false positives on type names.
-      'no-undef': 'off',
-      // Disable HTML/template formatting rules
+      // You can keep or re-add any Vue HTML/template rules here
       'vue/max-attributes-per-line': 'off',
       'vue/html-self-closing': 'off',
       'vue/singleline-html-element-content-newline': 'off',
@@ -46,25 +37,9 @@ export default tseslint.config(
       'vue/attributes-order': 'off',
       'vue/no-v-html': 'off',
       'vue/html-indent': 'off',
-      "vue/attribute-hyphenation": "off",
-    },
-  },
-  {
-    files: ['**/*.{ts,tsx,js,cjs,mjs}'],
-    languageOptions: {
-      parser: tseslint.parser,
-      ecmaVersion: 'latest',
-      sourceType: 'module',
-      globals: {
-        ...globals.browser,
-        ...globals.node,
-        ...globals.es2021,
-      },
-    },
-    rules: {
-      // Types are handled by TypeScript; avoid false positives on type names.
-      'no-undef': 'off',
-      'vue/no-unused-components': 'error'
+      'vue/attribute-hyphenation': 'off',
+      // Example extra rule you had
+      'vue/no-unused-components': 'error',
     },
   },
 );

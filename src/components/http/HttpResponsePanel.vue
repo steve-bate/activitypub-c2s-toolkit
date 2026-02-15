@@ -19,7 +19,7 @@ const props = withDefaults(defineProps<Props>(), {
   status: null,
   statusText: null,
   headers: null,
-  payload: null,
+  payload: undefined,
   payloadRaw: null,
   contentType: null
 })
@@ -103,7 +103,7 @@ const formattedText = computed(() => {
   if (typeof props.payload === 'string') return props.payload
   if (props.payloadRaw) return props.payloadRaw
   if (props.payload === null || props.payload === undefined) return ''
-  return String(props.payload)
+  return JSON.stringify(props.payload)
 })
 </script>
 

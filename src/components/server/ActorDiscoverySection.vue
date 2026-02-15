@@ -21,9 +21,14 @@ const emit = defineEmits<{
 
 const showJwtClaims = ref(false)
 
+const decodedJwtClaims = computed(() => {
+  if (!props.server.tokenResponse?.access_token) return null
+  return tryDecodeJWT(props.server.tokenResponse.access_token)
+})
+
 const highlightedJwtClaims = computed(() => {
   if (!props.server.tokenResponse?.access_token) return ''
-  const claims = tryDecodeJWT(props.server.tokenResponse.access_token)
+  const claims = decodedJwtClaims.value
   if (!claims) return ''
   return syntaxHighlightJson(formatJson(claims))
 })
@@ -39,7 +44,12 @@ function formatDiscoveryMethod(method: string): string {
 }
 
 function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text)
+ void  navigator.clipboard.writeText(text)
+}
+
+function copyDecodedJwtClaims() {
+  if (!decodedJwtClaims.value) return
+  copyToClipboard(formatJson(decodedJwtClaims.value))
 }
 </script>
 
@@ -217,7 +227,7 @@ function copyToClipboard(text: string) {
           <div class="flex justify-between items-center mb-2">
             <h4 class="text-sm font-medium text-gray-900 dark:text-gray-100">JWT Claims</h4>
             <button
-              @click="copyToClipboard(formatJson(tryDecodeJWT(server.tokenResponse!.access_token)))"
+              @click="copyDecodedJwtClaims"
               class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium flex items-center gap-1"
               title="Copy JSON to clipboard"
             >

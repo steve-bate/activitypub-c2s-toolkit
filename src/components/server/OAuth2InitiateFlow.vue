@@ -46,7 +46,7 @@ const form = reactive({
   identifier: props.server.identifier || '',
   name: props.server.name || '',
   baseUrl: props.server.baseUrl || '',
-  authType: (props.server.authType || 'oauth2') as AuthType,
+  authType: (props.server.authType || 'oauth2'),
   oauth2: {
     clientId: props.server.oauth2?.clientId || '',
     clientSecret: props.server.oauth2?.clientSecret || '',

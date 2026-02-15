@@ -66,7 +66,7 @@ function updateViewMode() {
 /**
  * Handle retry of failed dynamic client registration
  */
-async function handleRetryRegistration() {
+function handleRetryRegistration() {
   isRetrying.value = true
   registrationError.value = null
   try {
@@ -110,13 +110,13 @@ const responseContentType = computed(() => {
 
 
 function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text)
+ void  navigator.clipboard.writeText(text)
 }
 
 /**
  * Handle saving pre-registered client
  */
-async function handleSavePreregisteredClient() {
+function handleSavePreregisteredClient() {
   preregError.value = null
   preregSuccess.value = null
 
@@ -131,7 +131,7 @@ async function handleSavePreregisteredClient() {
     serverStore.updateServerProperty(props.server.id, 'oauth2', {
       ...(props.server.oauth2 || {}),
       clientId: preregClientId.value.trim(),
-      clientSecret: preregClientSecret.value.trim() || undefined,
+      clientSecret: preregClientSecret.value.trim(),
       registrationMethod: 'Manual'
     })
 
@@ -144,7 +144,7 @@ async function handleSavePreregisteredClient() {
       preregSuccess.value = null
     }, 3000)
   } catch (error) {
-    preregError.value = error?.message || 'Failed to save pre-registered client'
+    preregError.value = (error instanceof Error ? error.message : 'Failed to save pre-registered client')
   } finally {
     isPreregSaving.value = false
   }

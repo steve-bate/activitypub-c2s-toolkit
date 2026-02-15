@@ -7,7 +7,7 @@ import OAuthCallbackPage from '@/views/OAuthCallbackPage.vue'
 import PostResourcePage from '@/views/PostResourcePage.vue'
 
 const router = createRouter({
-  history: createWebHistory(import.meta.env.BASE_URL as string),
+  history: createWebHistory(import.meta.env.BASE_URL),
   routes: [
     {
       path: '/',

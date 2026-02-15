@@ -7,15 +7,15 @@ import { useServerStore } from '@/stores/serverStore'
 const route = useRoute()
 const serverStore = useServerStore()
 
-const responseData = ref(null)
+const responseData = ref<Record<string, unknown> | undefined>(undefined)
 const isLoading = ref(false)
 const error = ref<string | null>(null)
-const requestUrl = ref<string | null>(null)
-const requestHeaders = ref<Record<string, string> | null>(null)
-const responseStatus = ref<number | null>(null)
-const responseStatusText = ref<string | null>(null)
-const responseHeaders = ref<Record<string, string> | null>(null)
-const duration = ref<number | null>(null)
+const requestUrl = ref<string | undefined>(undefined)
+const requestHeaders = ref<Record<string, string> | undefined>(undefined)
+const responseStatus = ref<number | undefined>(undefined)
+const responseStatusText = ref<string | undefined>(undefined)
+const responseHeaders = ref<Record<string, string> | undefined>(undefined)
+const duration = ref<number | undefined>(undefined)
 
 /**
  * Fetch URI with ActivityPub headers and access token
@@ -25,13 +25,13 @@ async function handleFetch(uri: string) {
   
   isLoading.value = true
   error.value = null
-  responseData.value = null
+  responseData.value = undefined
   requestUrl.value = uri
-  requestHeaders.value = null
-  responseStatus.value = null
-  responseStatusText.value = null
-  responseHeaders.value = null
-  duration.value = null
+  requestHeaders.value = undefined
+  responseStatus.value = undefined
+  responseStatusText.value = undefined
+  responseHeaders.value = undefined
+  duration.value = undefined
   
   const startTime = Date.now()
   
@@ -58,7 +58,7 @@ async function handleFetch(uri: string) {
       response = await fetch(uri, { headers: fetchHeaders })
     } catch (err) {
       // If CORS error (likely due to Accept header), retry without it
-      if (err.message?.includes('CORS') || err.name === 'TypeError') {
+      if (err instanceof Error && (err.message?.includes('CORS') || err.name === 'TypeError')) {
         console.warn('CORS error with Accept header, retrying without custom Accept header')
         requestHeaders.value = { ...headers }
         response = await fetch(uri, { headers })
@@ -87,10 +87,10 @@ async function handleFetch(uri: string) {
     
     responseData.value = data
   } catch (err) {
-    if (err.message?.includes('CORS') || err.name === 'TypeError') {
+    if (err instanceof Error && (err.message?.includes('CORS') || err.name === 'TypeError')) {
       error.value = 'CORS Error: The server does not allow cross-origin requests. This is a server configuration issue. To fix: the server needs to add "Accept" and "Authorization" to Access-Control-Allow-Headers.'
     } else {
-      error.value = err?.message || 'Failed to fetch URI'
+      error.value = err instanceof Error ? err.message : 'Failed to fetch URI'
     }
     console.error('Fetch error:', err)
   } finally {
@@ -102,7 +102,7 @@ async function handleFetch(uri: string) {
 onMounted(() => {
   const uri = route.query.uri as string
   if (uri) {
-    handleFetch(uri)
+    void handleFetch(uri)
   }
 })
 
@@ -111,7 +111,7 @@ watch(
   () => route.query.uri,
   (newUri) => {
     if (newUri && typeof newUri === 'string') {
-      handleFetch(newUri)
+      void handleFetch(newUri)
     }
   }
 )
@@ -145,7 +145,7 @@ watch(
       await handleFetch(actorUri)
     } catch (err) {
       console.error('Error fetching actor after server change:', err)
-      error.value = `Failed to fetch actor: ${err.message || 'Unknown error'}`
+      error.value = `Failed to fetch actor: ${err instanceof Error ? err.message : 'Unknown error'}`
     }
   }
 )

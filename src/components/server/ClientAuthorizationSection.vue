@@ -108,19 +108,19 @@ async function handleAuthorize() {
     await initiateAuthorizationFlow({
       serverId: props.server.id,
       serverMetadata: props.server.authorizationServer.metadata!,
-      oauth2Config: props.server.oauth2!
+      oauth2Config: props.server.oauth2
     })
     
     // This will redirect, so we shouldn't reach here
   } catch (error) {
     console.error('Authorization initiation failed:', error)
-    authError.value = error?.message || 'Failed to initiate authorization'
+    authError.value = error instanceof Error ? error.message : 'Failed to initiate authorization'
     isAuthorizing.value = false
   }
 }
 
 function copyToClipboard(text: string) {
-  navigator.clipboard.writeText(text)
+ void  navigator.clipboard.writeText(text)
 }
 
 async function handleReauthorize() {
