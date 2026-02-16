@@ -393,7 +393,12 @@ async function handleSubmit() {
             <textarea
               v-model="rawJsonInput"
               rows="12"
-              :placeholder="'{\n  &quot;@context&quot;: &quot;https://www.w3.org/ns/activitystreams&quot;,\n  &quot;type&quot;: &quot;Follow&quot;,\n  &quot;actor&quot;: &quot;' + (activeActor?.uri || '...') + '&quot;,\n  &quot;object&quot;: &quot;https://example.com/users/alice&quot;\n}'"
+              placeholder='{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "type": "Follow",
+  "actor": "...",
+  "object": "https://example.com/users/alice"
+}'
               class="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 font-mono"
             ></textarea>
           </div>
