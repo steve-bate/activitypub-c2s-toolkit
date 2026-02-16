@@ -4,12 +4,13 @@
  * RFC 7636 - Proof Key for Code Exchange (PKCE)
  */
 
-import type { AuthorizationServerMetadata } from './authServerMetadataService'
-import type { OAuth2Config } from '@/stores/serverStore'
+import { HttpExchange, HttpRequestData, HttpResponseData } from '@/types/http'
+import type { AuthServerMetadata } from './authServerDiscoveryService'
+import { type OAuth2Config } from '@/stores/serverStore'
 
 export interface AuthorizationOptions {
   serverId: string
-  serverMetadata: AuthorizationServerMetadata
+  serverMetadata: AuthServerMetadata
   oauth2Config: OAuth2Config
   state?: string
 }
@@ -17,28 +18,8 @@ export interface AuthorizationOptions {
 export interface TokenExchangeOptions {
   serverId: string
   authCode: string
-  serverMetadata: AuthorizationServerMetadata
+  serverMetadata: AuthServerMetadata
   oauth2Config: OAuth2Config
-}
-
-export interface HttpRequestData<TParams = unknown> {
-  url: string
-  headers: Record<string, string>
-  params: TParams
-  timestamp?: string
-}
-
-export interface HttpResponseData<TParams = unknown> {
-  status_code: number
-  headers: Record<string, string>
-  payload: TParams
-}
-
-export interface HttpExchange<TRequest = unknown, TResponse = unknown> {
-  success: boolean
-  error?: string
-  request?: TRequest
-  response?: TResponse
 }
 
 export interface TokenExchangeParams {
@@ -146,9 +127,9 @@ function clearPKCEParameters(serverId: string): void {
 /**
  * Check if the server supports PKCE based on metadata
  */
-function supportsPKCE(metadata: AuthorizationServerMetadata): boolean {
-  return metadata.features.codeChallengeMethodsSupported.includes('S256') ||
-         metadata.features.codeChallengeMethodsSupported.includes('plain')
+function supportsPKCE(metadata: AuthServerMetadata): boolean {
+  return metadata.code_challenge_methods_supported.includes('S256') ||
+         metadata.code_challenge_methods_supported.includes('plain')
 }
 
 /**
@@ -162,7 +143,7 @@ export async function initiateAuthorizationFlow(options: AuthorizationOptions): 
   
   console.debug(`Initiating OAuth authorization flow for server ${serverId}`)
   
-  if (!serverMetadata.links.oauth_authorize) {
+  if (!serverMetadata.authorization_endpoint) {
     throw new Error('Authorization endpoint not found in server metadata')
   }
   
@@ -178,7 +159,7 @@ export async function initiateAuthorizationFlow(options: AuthorizationOptions): 
   const state = providedState || generateState()
   
   // Build authorization URL
-  const authUrl = new URL(serverMetadata.links.oauth_authorize)
+  const authUrl = new URL(serverMetadata.authorization_endpoint)
   authUrl.searchParams.append('client_id', oauth2Config.clientId)
   authUrl.searchParams.append('redirect_uri', oauth2Config.redirectUri)
   authUrl.searchParams.append('response_type', 'code')
@@ -271,13 +252,13 @@ export async function exchangeCodeForToken(
   
   console.debug(`Exchanging authorization code for access token (server ${serverId})`)
   
-  if (!serverMetadata.links.oauth_token) {
+  if (!serverMetadata.token_endpoint) {
     return {
       success: false,
       error: 'Token endpoint not found in server metadata'
     }
   }
-  
+
   if (!oauth2Config.clientId) {
     return {
       success: false,
@@ -329,7 +310,7 @@ export async function exchangeCodeForToken(
   const timestamp = new Date().toISOString()
 
   try {
-    const response = await fetch(serverMetadata.links.oauth_token, {
+    const response = await fetch(serverMetadata.token_endpoint, {
       method: 'POST',
       headers,
       body: tokenParams.toString()
@@ -373,7 +354,7 @@ export async function exchangeCodeForToken(
       },
       request: {
         params: tokenRequestParams,
-        url: serverMetadata.links.oauth_token,
+        url: serverMetadata.token_endpoint,
         headers,
         timestamp
       }
@@ -399,12 +380,12 @@ export async function exchangeCodeForToken(
 export async function refreshAccessToken(
   serverId: string,
   refreshToken: string,
-  serverMetadata: AuthorizationServerMetadata,
+  serverMetadata: AuthServerMetadata,
   oauth2Config: OAuth2Config
 ): Promise<HttpExchange<TokenRefreshRequest, TokenResponsePayload>> {
   console.debug(`Refreshing access token for server ${serverId}`)
   
-  if (!serverMetadata.links.oauth_token) {
+  if (!serverMetadata.token_endpoint) {
     return {
       success: false,
       error: 'Token endpoint not found in server metadata'
@@ -444,7 +425,7 @@ export async function refreshAccessToken(
   }
   
   try {
-    const response = await fetch(serverMetadata.links.oauth_token, {
+    const response = await fetch(serverMetadata.token_endpoint, {
       method: 'POST',
       headers,
       body: tokenParams.toString()
@@ -480,7 +461,7 @@ export async function refreshAccessToken(
       success: true,
       response: tokenResponse,
       request: {
-        url: serverMetadata.links.oauth_token,
+        url: serverMetadata.token_endpoint,
         headers,
         params: tokenRefreshParams
       }
@@ -509,12 +490,12 @@ export async function revokeToken(
   serverId: string,
   token: string,
   tokenTypeHint: 'access_token' | 'refresh_token',
-  serverMetadata: AuthorizationServerMetadata,
+  serverMetadata: AuthServerMetadata,
   oauth2Config: OAuth2Config
 ): Promise<{ success: boolean; error?: string }> {
   console.debug(`Revoking ${tokenTypeHint} for server ${serverId}`)
   
-  if (!serverMetadata.links.oauth_revoke) {
+  if (!serverMetadata.revocation_endpoint) {
     console.warn('Revocation endpoint not available')
     return {
       success: false,
@@ -542,7 +523,7 @@ export async function revokeToken(
   }
   
   try {
-    const response = await fetch(serverMetadata.links.oauth_revoke, {
+    const response = await fetch(serverMetadata.revocation_endpoint, {
       method: 'POST',
       headers,
       body: revokeParams.toString()

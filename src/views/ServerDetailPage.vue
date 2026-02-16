@@ -8,11 +8,11 @@ import ClientAuthorizationSection from '@/components/server/ClientAuthorizationS
 import ResourceServerMetadataSection from '@/components/server/ResourceServerMetadataSection.vue'
 import AccessTokenSection from '@/components/server/AccessTokenSection.vue'
 import ActorDiscoverySection from '@/components/server/ActorDiscoverySection.vue'
-import { parseServerIdentifier, discoverServerMetadata } from '@/services/authServerMetadataService'
+import { parseUrl, discoverServerMetadata } from '@/services/authServerDiscoveryService'
 import { refreshAccessToken, revokeToken, initiateAuthorizationFlow } from '@/services/authorizationService'
 import { discoverActor as getActor } from '@/services/actorDiscoveryService'
 import { getNodeInfo } from '@/services/nodeinfoService'
-import { registerClient, createDefaultClientMetadata, isDefined } from '@/services/clientRegistrationService'
+import { registerClient, defaultClientRegistrationParams, isDefined } from '@/services/clientRegistrationService'
 
 const router = useRouter()
 const route = useRoute()
@@ -34,7 +34,8 @@ onMounted(() => {
     
     // Automatically load NodeInfo if not already loaded
     const serverValue = server.value
-    if (serverValue && !serverValue.nodeinfo && !serverValue.nodeinfoError && !isLoadingNodeInfo.value) {
+    const nodeinfo = server.value?.nodeinfo
+    if (!nodeinfo && !isLoadingNodeInfo.value) {
       void handleLoadNodeInfo()
     }
     
@@ -62,7 +63,7 @@ watch(
 watch(
   () => server.value,
   (newServer) => {
-    if (newServer && !newServer.nodeinfo && !newServer.nodeinfoError && !isLoadingNodeInfo.value) {
+    if (newServer && !newServer.nodeinfo && !isLoadingNodeInfo.value) {
       void handleLoadNodeInfo()
     }
     
@@ -108,19 +109,19 @@ async function handleAutomaticAuthFlow() {
   if (!server.value) return
   
   // Step 1: Discover authorization server metadata if not present
-  if (!server.value.authorizationServer?.metadata && !isDiscoveringMetadata.value) {
+  if (!server.value.auth?.oauth2?.authServerDiscovery && !isDiscoveringMetadata.value) {
     await handleAutoDiscoverMetadata()
   }
   
   // Step 2: Register client if metadata exists but no client credentials
-  if (server.value.authorizationServer?.metadata && 
+  if (server.value.auth?.oauth2?.authServerDiscovery && 
       (!server.value.oauth2?.clientId || server.value.oauth2.clientId === '') && 
       !isRegisteringClient.value) {
     await handleAutoRegisterClient()
   }
   
   // Step 3: Initiate authorization if client is registered but no token
-  if (server.value.authorizationServer?.metadata && 
+  if (server.value.auth?.oauth2?.authServerDiscovery && 
       server.value.oauth2?.clientId && 
       !server.value.tokenResponse?.access_token && 
       !isInitiatingAuth.value) {
@@ -145,13 +146,11 @@ async function handleAutoDiscoverMetadata() {
   isDiscoveringMetadata.value = true
   
   try {
-    const result = await discoverServerMetadata(server.value.identifier)
+    const serverUrl = parseUrl(server.value.identifier)
+    const result = await discoverServerMetadata(serverUrl)
     
-    if (result.success && result.metadata) {
-      serverStore.saveDiscoveryMetadata(server.value.id, result.metadata, { 
-        method: result.discoveryMethod as 'RFC8414' | 'Mastodon' | 'Manual',
-        statusCode: 200
-      })
+    if (result.exchange.success) {
+      serverStore.saveAuthServerDiscoveryResult(server.value.id, result)
       serverStore.setAuthStatus(server.value.id, 'configured')
       
       // Continue to next step
@@ -168,33 +167,44 @@ async function handleAutoDiscoverMetadata() {
  * Automatically register client
  */
 async function handleAutoRegisterClient() {
-  if (!server.value?.authorizationServer?.metadata?.links?.registration_endpoint) return
-  if (!isDefined(server.value.authorizationServer.metadata.links.registration_endpoint)) return
+  const authServerMetadata = server.value?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
+  if (!authServerMetadata?.registration_endpoint) return
+  if (!isDefined(authServerMetadata.registration_endpoint)) return
   if (isRegisteringClient.value) return
   
   isRegisteringClient.value = true
   
+  if (!server.value) {
+    isRegisteringClient.value = false
+    console.error('No server found for client registration')
+    return
+  }
+
   try {
-    const serverScopes = server.value.authorizationServer.metadata.features?.scopesSupported?.join(' ') || 
+    const serverScopes = authServerMetadata.scopes_supported?.join(' ') || 
                         server.value.oauth2?.scopes || 
                         'read write follow'
     
-    const clientMetadata = createDefaultClientMetadata(
+    const clientMetadata = defaultClientRegistrationParams(
       server.value.name,
-      server.value.oauth2?.redirectUri || `${window.location.origin}/callback`,
+      [server.value.oauth2?.redirectUri || `${window.location.origin}/callback`],
       serverScopes
     )
     
-    const serverInfo = parseServerIdentifier(server.value.identifier)
+    if (server.value.auth?.oauth2?.authServerDiscovery?.discoveryMethod === 'Mastodon') {
+      clientMetadata.redirect_uris = clientMetadata.redirect_uris[0] // Mastodon expects single string
+    }
+
+    const serverUrl = parseUrl(server.value.identifier)
     
     const result = await registerClient(
-      serverInfo,
-      server.value.authorizationServer.metadata.links.registration_endpoint,
+      serverUrl,
+      authServerMetadata.registration_endpoint,
       clientMetadata
     )
     
     // Save registration exchange even on failure so user can see what went wrong
-    if (result.requestData) {
+    if (result.exchange.request) {
       const oauth2Config = server.value.oauth2 || {
         clientId: '',
         clientSecret: '',
@@ -203,20 +213,20 @@ async function handleAutoRegisterClient() {
       }
       
       // Store error if registration failed
-      if (!result.success) {
+      if (!result.exchange.success) {
         serverStore.updateServerProperty(server.value.id, 'oauth2', {
           ...oauth2Config,
-          registrationError: result.error || 'Registration failed'
+          registrationError: result.exchange.error || 'Registration failed'
         })
       }
     }
     
-    if (result.success && result.data) {
+    if (result.exchange.success && result.exchange.response?.payload) {
       serverStore.updateServerProperty(server.value.id, 'oauth2', {
-        clientId: result.data.client_id,
-        clientSecret: result.data.client_secret || '',
-        redirectUri: result.data.redirect_uris?.[0] || server.value.oauth2?.redirectUri || '',
-        scopes: result.data.scope || server.value.oauth2?.scopes || 'read write follow',
+        clientId: result.exchange.response.payload.client_id,
+        clientSecret: result.exchange.response.payload.client_secret || '',
+        redirectUri: result.exchange.response.payload.redirect_uris?.[0] || server.value.oauth2?.redirectUri || '',
+        scopes: result.exchange.response.payload.scope || server.value.oauth2?.scopes || 'read write follow',
         registrationMethod: result.registrationMethod || 'Manual',
         registrationError: undefined
       })
@@ -235,7 +245,15 @@ async function handleAutoRegisterClient() {
  * Automatically initiate authorization
  */
 async function handleAutoInitiateAuth() {
-  if (!server.value?.authorizationServer?.metadata?.links?.oauth_authorize) return
+  const authServerMetadata = server.value?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
+  if (!authServerMetadata?.authorization_endpoint) return
+
+  if (!server.value) {
+    isInitiatingAuth.value = false
+    console.error('No server found for initiating authorization')
+    return
+  }
+
   if (!server.value.oauth2?.clientId || !server.value.oauth2?.redirectUri) return
   if (isInitiatingAuth.value) return
   
@@ -244,7 +262,7 @@ async function handleAutoInitiateAuth() {
   try {
     await initiateAuthorizationFlow({
       serverId: server.value.id,
-      serverMetadata: server.value.authorizationServer.metadata,
+      serverMetadata: authServerMetadata,
       oauth2Config: server.value.oauth2
     })
     // This will redirect, so we shouldn't reach here
@@ -260,7 +278,8 @@ async function handleAutoInitiateAuth() {
  */
 async function handleRefreshToken() {
   if (!server.value || !server.value.tokenResponse?.refresh_token) return
-  if (!server.value.authorizationServer.metadata || !server.value.oauth2) return
+  const authServerMetadata = server.value?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
+  if (!authServerMetadata || !server.value.oauth2) return
 
   isRefreshing.value = true
   tokenError.value = null
@@ -270,7 +289,7 @@ async function handleRefreshToken() {
     const result = await refreshAccessToken(
       server.value.id,
       server.value.tokenResponse.refresh_token,
-      server.value.authorizationServer.metadata,
+      authServerMetadata,
       server.value.oauth2
     )
 
@@ -281,8 +300,7 @@ async function handleRefreshToken() {
       try {
         const actorResult = await getActor(
           result.response,
-          server.value.authorizationServer.metadata,
-          result.response.access_token,
+          authServerMetadata,
           server.value.oauth2.clientId,
           server.value.oauth2.clientSecret
         )
@@ -313,7 +331,8 @@ async function handleRefreshToken() {
  */
 async function handleDiscoverActor() {
   if (!server.value?.tokenResponse?.access_token) return
-  if (!server.value.authorizationServer.metadata || !server.value.oauth2) return
+  const authServerMetadata = server.value?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
+  if (!authServerMetadata || !server.value.oauth2) return
 
   isRefreshingActor.value = true
   actorError.value = null
@@ -322,8 +341,7 @@ async function handleDiscoverActor() {
   try {
     const actorResult = await getActor(
       server.value.tokenResponse,
-      server.value.authorizationServer.metadata,
-      server.value.tokenResponse.access_token,
+      authServerMetadata,
       server.value.oauth2.clientId,
       server.value.oauth2.clientSecret
     )
@@ -353,7 +371,8 @@ async function handleDiscoverActor() {
  */
 async function handleRefreshActor() {
   if (!server.value?.tokenResponse?.access_token) return
-  if (!server.value.authorizationServer.metadata || !server.value.oauth2) return
+  const authServerMetadata = server.value?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
+  if (!authServerMetadata || !server.value.oauth2) return
 
   isRefreshingActor.value = true
   actorError.value = null
@@ -362,8 +381,7 @@ async function handleRefreshActor() {
   try {
     const actorResult = await getActor(
       server.value.tokenResponse,
-      server.value.authorizationServer.metadata,
-      server.value.tokenResponse.access_token,
+      authServerMetadata,
       server.value.oauth2.clientId,
       server.value.oauth2.clientSecret
     )
@@ -404,11 +422,12 @@ async function handleLoadNodeInfo() {
   nodeinfoSuccess.value = null
 
   try {
-    const result = await getNodeInfo(server.value.baseUrl)
+    const [indexExchange, dataExchange] = await getNodeInfo(server.value.baseUrl)
+    serverStore.saveNodeInfo(server.value.id, dataExchange, indexExchange)
     
-    if (result.indexResult.status === 'success' && result.dataResult?.status === 'success' && 
-        result.indexResult.data && result.dataResult.data) {
-      serverStore.saveNodeInfo(server.value.id, result.dataResult.data, result.indexResult.data)
+    if (indexExchange && dataExchange && 
+        indexExchange?.success && dataExchange?.success && 
+        indexExchange?.response?.payload && dataExchange?.response?.payload) {
       nodeinfoSuccess.value = 'NodeInfo loaded successfully'
       setTimeout(() => {
         nodeinfoSuccess.value = null
@@ -416,74 +435,24 @@ async function handleLoadNodeInfo() {
     } else {
       // Determine which part failed and construct error message
       let errorMessage = ''
-      if (result.indexResult.status === 'error') {
-        errorMessage = result.indexResult.error || 'NodeInfo index fetch failed'
-        if (result.indexResult.httpRequest) {
-          errorMessage += ` (HTTP ${result.indexResult.httpRequest.status})`
+      if (!indexExchange?.success) {
+        errorMessage = indexExchange?.error || 'NodeInfo index fetch failed'
+        if (indexExchange?.response) {
+          errorMessage += ` (HTTP ${indexExchange?.response?.status_code || 'unknown'})`
         }
-      } else if (result.dataResult?.status === 'error') {
-        errorMessage = result.dataResult.error || 'NodeInfo data fetch failed'
-        if (result.dataResult.httpRequest) {
-          errorMessage += ` (HTTP ${result.dataResult.httpRequest.status})`
+      } else if (!dataExchange?.success) {
+        errorMessage = dataExchange?.error || 'NodeInfo data fetch failed'
+        if (dataExchange?.response) {
+          errorMessage += ` (HTTP ${dataExchange?.response?.status_code || 'unknown'})`
         }
       } else {
         errorMessage = 'NodeInfo loading failed'
       }
       nodeinfoError.value = errorMessage
-      serverStore.saveNodeInfoError(server.value.id, errorMessage)
     }
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : 'Unexpected error loading NodeInfo'
     nodeinfoError.value = errorMessage
-    serverStore.saveNodeInfoError(server.value.id, errorMessage)
-  } finally {
-    isLoadingNodeInfo.value = false
-  }
-}
-
-/**
- * Refresh NodeInfo information
- */
-async function handleRefreshNodeInfo() {
-  if (!server.value) return
-
-  isLoadingNodeInfo.value = true
-  nodeinfoError.value = null
-  nodeinfoSuccess.value = null
-
-  try {
-    const result = await getNodeInfo(server.value.baseUrl)
-    
-    if (result.indexResult.status === 'success' && result.dataResult?.status === 'success' && 
-        result.indexResult.data && result.dataResult.data) {
-      serverStore.saveNodeInfo(server.value.id, result.dataResult.data, result.indexResult.data)
-      nodeinfoSuccess.value = 'NodeInfo refreshed successfully'
-      setTimeout(() => {
-        nodeinfoSuccess.value = null
-      }, 5000)
-    } else {
-      // Determine which part failed and construct error message
-      let errorMessage = ''
-      if (result.indexResult.status === 'error') {
-        errorMessage = result.indexResult.error || 'NodeInfo index fetch failed'
-        if (result.indexResult.httpRequest) {
-          errorMessage += ` (HTTP ${result.indexResult.httpRequest.status})`
-        }
-      } else if (result.dataResult?.status === 'error') {
-        errorMessage = result.dataResult.error || 'NodeInfo data fetch failed'
-        if (result.dataResult.httpRequest) {
-          errorMessage += ` (HTTP ${result.dataResult.httpRequest.status})`
-        }
-      } else {
-        errorMessage = 'NodeInfo refresh failed'
-      }
-      nodeinfoError.value = errorMessage
-      serverStore.saveNodeInfoError(server.value.id, errorMessage)
-    }
-  } catch (error) {
-    const errorMessage = error instanceof Error ? error.message : 'Unexpected error refreshing NodeInfo'
-    nodeinfoError.value = errorMessage
-    serverStore.saveNodeInfoError(server.value.id, errorMessage)
   } finally {
     isLoadingNodeInfo.value = false
   }
@@ -494,7 +463,8 @@ async function handleRefreshNodeInfo() {
  */
 async function handleRevokeToken() {
   if (!server.value || !server.value.tokenResponse?.access_token) return
-  if (!server.value.authorizationServer.metadata || !server.value.oauth2) return
+  const authServerMetadata = server.value?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
+  if (!authServerMetadata || !server.value.oauth2) return
 
   if (!confirm('Are you sure you want to revoke this access token? You will need to authorize again.')) {
     return
@@ -509,7 +479,7 @@ async function handleRevokeToken() {
       server.value.id,
       server.value.tokenResponse.access_token,
       'access_token',
-      server.value.authorizationServer.metadata,
+      authServerMetadata,
       server.value.oauth2
     )
 
@@ -555,7 +525,7 @@ function handleClearActorError() {
       <!-- Header -->
       <div class="flex items-center justify-between">
         <div>
-          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ server.nodeinfo?.metadata?.nodeName ?? server.name }}</h1>
+          <h1 class="text-3xl font-bold text-gray-900 dark:text-white">{{ server.nodeinfo?.data?.response?.payload?.metadata?.nodeName ?? server.name }}</h1>
           <p class="text-gray-600 dark:text-gray-400 mt-2"><a target="_blank" rel="noopener noreferrer" :href="server.baseUrl">{{ server.baseUrl }}</a></p>
         </div>
         <div class="text-right">
@@ -575,7 +545,7 @@ function handleClearActorError() {
       <ResourceServerMetadataSection 
         :server="server" 
         @load="handleLoadNodeInfo" 
-        @refresh="handleRefreshNodeInfo"
+        @refresh="handleLoadNodeInfo"
       />
 
       <!-- Authorization Server Metadata Section -->

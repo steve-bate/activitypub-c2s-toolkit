@@ -2,8 +2,7 @@
 import { ref, computed } from 'vue'
 import type { ResourceServerMetadata } from '@/stores/serverStore'
 import { useServerStore } from '@/stores/serverStore'
-import { discoverServerMetadata } from '@/services/authServerMetadataService'
-import { formatJson, syntaxHighlightJson } from '@/utils/jsonHighlighter'
+import { discoverServerMetadata, parseUrl } from '@/services/authServerDiscoveryService'
 import CopyIcon from '@/components/icons/CopyIcon.vue'
 import HttpRequestPanel from '@/components/http/HttpRequestPanel.vue'
 import HttpResponsePanel from '@/components/http/HttpResponsePanel.vue'
@@ -15,7 +14,6 @@ interface Props {
 const props = defineProps<Props>()
 
 const serverStore = useServerStore()
-const showFullJson = ref(false)
 const isDiscovering = ref(false)
 const discoveryError = ref<string | null>(null)
 
@@ -23,13 +21,16 @@ function copyToClipboard(text: string) {
  void  navigator.clipboard.writeText(text)
 }
 
-const highlightedJson = computed(() => {
-  if (!props.server.authorizationServer?.metadata?.raw) return ''
-  return syntaxHighlightJson(formatJson(props.server.authorizationServer.metadata.raw))
+const authServerResult = computed(() => {
+  return props.server.auth?.oauth2?.authServerDiscovery
+})
+
+const authServerMetadata = computed(() => {
+  return authServerResult.value?.exchange?.response?.payload || null
 })
 
 const supportsPKCE = computed(() => {
-  const methods = props.server.authorizationServer?.metadata?.features?.codeChallengeMethodsSupported
+  const methods = authServerMetadata.value?.code_challenge_methods_supported
   if (!methods || methods.length === 0) return false
   return methods.includes('S256')
 })
@@ -45,18 +46,16 @@ async function handleRefreshMetadata() {
 
   try {
     // Run discovery
-    const result = await discoverServerMetadata(props.server.identifier)
+    const serverUrl = parseUrl(props.server.identifier)
+    const result = await discoverServerMetadata(serverUrl)
 
-    if (result.success && result.metadata) {
+    if (result.exchange.success && result.exchange.response?.payload) {
       // Save metadata with discovery method
-      serverStore.saveDiscoveryMetadata(props.server.id, result.metadata, { 
-        method: result.discoveryMethod as 'RFC8414' | 'Mastodon' | 'Manual',
-        statusCode: 200
-      })
-      serverStore.setAuthStatus(props.server.id, 'configured')
+      serverStore.saveDiscoveryMetadata(props.server.id, result)
+      serverStore.setAuthStatus(props.server.id, 'authserver-configured')
 
     } else {
-      discoveryError.value = result.error || 'Discovery failed'
+      discoveryError.value = result.exchange.error || 'Discovery failed'
     }
   } catch (error) {
     discoveryError.value = (error instanceof Error ? error.message : 'Unexpected error during discovery')
@@ -108,24 +107,24 @@ async function handleRefreshMetadata() {
       </div>
     </div>
 
-    <div v-if="server.authorizationServer?.metadata" class="space-y-4">
+    <div v-if="authServerMetadata" class="space-y-4">
       <!-- Discovery Method Badge -->
       <div class="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
         <span class="text-sm text-gray-600 dark:text-gray-400">Discovery Method:</span>
         <span 
           class="px-3 py-1 rounded-full text-xs font-semibold"
           :class="{
-            'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200': server.authorizationServer.metadata.discoveryMethod === 'RFC8414',
-            'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200': server.authorizationServer.metadata.discoveryMethod === 'Mastodon',
-            'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200': server.authorizationServer.metadata.discoveryMethod === 'Manual'
+            'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200': authServerResult?.discoveryMethod === 'RFC8414',
+            'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200': authServerResult?.discoveryMethod === 'Mastodon',
+            'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200': authServerResult?.discoveryMethod === 'Manual'
           }"
         >
-          {{ server.authorizationServer.metadata.discoveryMethod || 'Manual' }}
+          {{ authServerResult?.discoveryMethod || 'Manual' }}
         </span>
-        <span v-if="server.authorizationServer.metadata.discoveryMethod === 'RFC8414'" class="text-xs text-gray-500 dark:text-gray-400">
+        <span v-if="authServerResult?.discoveryMethod === 'RFC8414'" class="text-xs text-gray-500 dark:text-gray-400">
           (Standard OAuth 2.0 Authorization Server Metadata)
         </span>
-        <span v-else-if="server.authorizationServer.metadata.discoveryMethod === 'Mastodon'" class="text-xs text-gray-500 dark:text-gray-400">
+        <span v-else-if="authServerResult?.discoveryMethod === 'Mastodon'" class="text-xs text-gray-500 dark:text-gray-400">
           (Mastodon-compatible fallback)
         </span>
       </div>
@@ -138,11 +137,11 @@ async function handleRefreshMetadata() {
             Authorization Endpoint
           </label>
           <div class="flex items-center gap-2">
-            <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" :title="server.authorizationServer.metadata.links.oauth_authorize">
-              {{ server.authorizationServer.metadata.links.oauth_authorize }}
+            <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" :title="authServerMetadata.authorization_endpoint">
+              {{ authServerMetadata.authorization_endpoint }}
             </code>
             <button
-              @click="copyToClipboard(server.authorizationServer.metadata.links.oauth_authorize)"
+              @click="copyToClipboard(authServerMetadata.authorization_endpoint ?? '')"
               class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
               title="Copy to clipboard"
             >
@@ -157,11 +156,11 @@ async function handleRefreshMetadata() {
             Token Endpoint
           </label>
           <div class="flex items-center gap-2">
-            <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" :title="server.authorizationServer.metadata.links.oauth_token">
-              {{ server.authorizationServer.metadata.links.oauth_token }}
+            <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" :title="authServerMetadata.token_endpoint">
+              {{ authServerMetadata.token_endpoint }}
             </code>
             <button
-              @click="copyToClipboard(server.authorizationServer.metadata.links.oauth_token)"
+              @click="copyToClipboard(authServerMetadata.token_endpoint ?? '')"
               class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
               title="Copy to clipboard"
             >
@@ -175,12 +174,12 @@ async function handleRefreshMetadata() {
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Introspection Endpoint
           </label>
-          <div v-if="server.authorizationServer.metadata.links.oauth_introspect" class="flex items-center gap-2">
-            <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" :title="server.authorizationServer.metadata.links.oauth_introspect">
-              {{ server.authorizationServer.metadata.links.oauth_introspect }}
+          <div v-if="authServerMetadata.introspection_endpoint" class="flex items-center gap-2">
+            <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" :title="authServerMetadata.introspection_endpoint">
+              {{ authServerMetadata.introspection_endpoint }}
             </code>
             <button
-              @click="copyToClipboard(server.authorizationServer.metadata.links.oauth_introspect)"
+              @click="copyToClipboard(authServerMetadata.introspection_endpoint ?? '')"
               class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
               title="Copy to clipboard"
             >
@@ -197,12 +196,12 @@ async function handleRefreshMetadata() {
           <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
             Registration Endpoint
           </label>
-          <div v-if="server.authorizationServer.metadata.links.registration_endpoint" class="flex items-center gap-2">
-            <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" :title="server.authorizationServer.metadata.links.registration_endpoint">
-              {{ server.authorizationServer.metadata.links.registration_endpoint }}
+          <div v-if="authServerMetadata.registration_endpoint" class="flex items-center gap-2">
+            <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" :title="authServerMetadata.registration_endpoint">
+              {{ authServerMetadata.registration_endpoint }}
             </code>
             <button
-              @click="copyToClipboard(server.authorizationServer.metadata.links.registration_endpoint)"
+              @click="copyToClipboard(authServerMetadata.registration_endpoint ?? '')"
               class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
               title="Copy to clipboard"
             >
@@ -244,24 +243,24 @@ async function handleRefreshMetadata() {
           </summary>
           <div class="mt-4 space-y-6">
             <!-- RFC 8414 Discovery Details -->
-            <div v-if="server.authorizationServer.metadata.discoveryMethod === 'RFC8414'" class="space-y-4">
+            <div v-if="server.auth?.oauth2?.authServerDiscovery?.discoveryMethod === 'RFC8414'" class="space-y-4">
               <HttpRequestPanel
-                title="RFC 8414 Discovery Request"
+                title="Request"
                 :headers="{ 'Accept': 'application/json' }"
                 :url="`${server.identifier.includes('://') ? server.identifier : 'https://' + server.identifier}/.well-known/oauth-authorization-server`"
               />
               <HttpResponsePanel
-                title="RFC 8414 Discovery Response"
-                :status="server.authorizationServer.status_code || 200"
+                title="Response"
+                :status="server.auth?.oauth2?.authServerDiscovery?.exchange.response?.status_code || 0"
                 status-text="OK"
                 :headers="{ 'Content-Type': 'application/json' }"
-                :payload="server.authorizationServer.metadata.raw"
+                :payload="authServerMetadata"
                 content-type="application/json"
               />
             </div>
 
             <!-- Mastodon Discovery Details -->
-            <div v-else-if="server.authorizationServer.metadata.discoveryMethod === 'Mastodon'" class="space-y-4">
+            <div v-else-if="server.auth?.oauth2?.authServerDiscovery?.discoveryMethod === 'Mastodon'" class="space-y-4">
               <div class="p-4 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg">
                 <div class="flex gap-3">
                   <svg class="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -278,46 +277,20 @@ async function handleRefreshMetadata() {
                 </div>
               </div>
               <HttpRequestPanel
-                title="Instance API Request"
+                title="Request"
                 :headers="{ 'Accept': 'application/json' }"
                 :url="`${server.identifier.includes('://') ? server.identifier : 'https://' + server.identifier}/api/v1/instance`"
               />
               <HttpResponsePanel
-                title="Instance API Response"
+                title="Response"
                 :status="200"
                 status-text="OK"
                 :headers="{ 'Content-Type': 'application/json' }"
-                :payload="server.authorizationServer.metadata.raw"
+                :payload="authServerMetadata"
                 content-type="application/json"
               />
             </div>
 
-            <!-- Full JSON Response Toggle -->
-            <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
-              <button
-                @click="showFullJson = !showFullJson"
-                class="text-sm text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium flex items-center gap-2"
-              >
-                <svg class="w-4 h-4" :class="{ 'rotate-90': showFullJson }" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"></path>
-                </svg>
-                {{ showFullJson ? 'Hide' : 'Show' }} Full Response JSON
-              </button>
-
-              <div v-if="showFullJson" class="mt-4 bg-gray-50 dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-700 p-4 overflow-x-auto">
-                <div class="flex justify-end mb-2">
-                  <button
-                    @click="copyToClipboard(formatJson(server.authorizationServer.metadata.raw))"
-                    class="text-xs text-blue-600 dark:text-blue-400 hover:text-blue-800 dark:hover:text-blue-300 font-medium flex items-center gap-1"
-                    title="Copy JSON to clipboard"
-                  >
-                    <CopyIcon class="w-4 h-4" />
-                    Copy JSON
-                  </button>
-                </div>
-                <pre class="text-xs font-mono whitespace-pre-wrap break-words" v-html="highlightedJson"></pre>
-              </div>
-            </div>
           </div>
         </details>
       </div>

@@ -20,7 +20,7 @@ const nodeinfoIndexUrl = computed(() => {
 })
 
 const nodeinfoDocumentUrl = computed(() => {
-  const index = props.server.nodeinfoIndex
+  const index = props.server.nodeinfo?.index?.response?.payload
   if (!index?.links?.length) return null
   const links = index.links.filter(link =>
     link.rel?.startsWith('http://nodeinfo.diaspora.software/ns/schema/')
@@ -41,7 +41,7 @@ const nodeinfoResponseHeaders = computed(() => ({
   'Content-Type': 'application/json'
 }))
 
-const nodeinfoIndexStatus = computed(() => (props.server.nodeinfoIndex ? 200 : null))
+const nodeinfoIndexStatus = computed(() => (props.server.nodeinfo?.index?.response?.payload ? 200 : null))
 const nodeinfoDocumentStatus = computed(() => (props.server.nodeinfo ? 200 : null))
 </script>
 
@@ -61,7 +61,7 @@ const nodeinfoDocumentStatus = computed(() => (props.server.nodeinfo ? 200 : nul
     </div>
 
     <!-- NodeInfo Display -->
-    <div v-if="server.nodeinfo" class="space-y-4">
+    <div v-if="server.nodeinfo?.data?.success && !server.nodeinfo?.data?.error" class="space-y-4">
       <!-- Software Name and Version -->
       <div class="grid grid-cols-2 gap-4">
         <div>
@@ -69,7 +69,7 @@ const nodeinfoDocumentStatus = computed(() => (props.server.nodeinfo ? 200 : nul
             Software Name
           </label>
           <div class="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-900 dark:text-gray-100">
-            {{ server.nodeinfo.software.name }}
+            {{ server.nodeinfo?.data?.response?.payload?.software?.name }}
           </div>
         </div>
         <div>
@@ -77,19 +77,19 @@ const nodeinfoDocumentStatus = computed(() => (props.server.nodeinfo ? 200 : nul
             Version
           </label>
           <div class="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-900 dark:text-gray-100">
-            {{ server.nodeinfo.software.version }}
+            {{ server.nodeinfo?.data?.response?.payload?.software?.version }}
           </div>
         </div>
       </div>
 
       <!-- Protocols -->
-      <div v-if="server.nodeinfo.protocols && server.nodeinfo.protocols.length > 0">
+      <div v-if="server.nodeinfo?.data?.response?.payload?.protocols && server.nodeinfo?.data?.response?.payload?.protocols.length > 0">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Protocols
         </label>
         <div class="flex flex-wrap gap-2">
           <span
-            v-for="protocol in server.nodeinfo.protocols"
+            v-for="protocol in server.nodeinfo?.data?.response?.payload?.protocols"
             :key="protocol"
             class="px-2 py-1 bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200 text-xs font-medium rounded"
           >
@@ -99,7 +99,7 @@ const nodeinfoDocumentStatus = computed(() => (props.server.nodeinfo ? 200 : nul
       </div>
 
       <!-- HTTP Exchange Panels -->
-      <div class="pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div v-if="server.nodeinfo?.data?.success" class="pt-4 border-t border-gray-200 dark:border-gray-700">
         <details class="group">
           <summary class="flex items-center gap-2 cursor-pointer text-sm font-semibold text-gray-800 dark:text-gray-200 select-none">
             <svg class="w-4 h-4 transition-transform group-open:rotate-90" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -119,7 +119,7 @@ const nodeinfoDocumentStatus = computed(() => (props.server.nodeinfo ? 200 : nul
               :status="nodeinfoIndexStatus"
               status-text="OK"
               :headers="nodeinfoResponseHeaders"
-              :payload="server.nodeinfoIndex"
+              :payload="server.nodeinfo?.index?.response?.payload"
               content-type="application/json"
             />
 
@@ -134,7 +134,7 @@ const nodeinfoDocumentStatus = computed(() => (props.server.nodeinfo ? 200 : nul
               :status="nodeinfoDocumentStatus"
               status-text="OK"
               :headers="nodeinfoResponseHeaders"
-              :payload="server.nodeinfo"
+              :payload="server.nodeinfo.data?.response?.payload"
               content-type="application/json"
             />
           </div>
@@ -142,25 +142,15 @@ const nodeinfoDocumentStatus = computed(() => (props.server.nodeinfo ? 200 : nul
       </div>
     </div>
 
-    <!-- No NodeInfo State -->
-    <div v-else-if="!server.nodeinfoError" class="text-center py-8">
-      <svg class="w-12 h-12 mx-auto text-gray-400 dark:text-gray-600 mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-      </svg>
-      <p class="text-gray-600 dark:text-gray-400 mb-4">
-        Loading NodeInfo...
-      </p>
-    </div>
-
     <!-- Error State -->
-    <div v-else class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+    <div v-else-if="!server.nodeinfo?.data?.success" class="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
       <div class="flex items-start gap-2">
         <svg class="w-5 h-5 text-red-600 dark:text-red-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
         </svg>
         <div class="flex-1">
           <p class="text-sm font-medium text-red-800 dark:text-red-200">
-            {{ server.nodeinfoError }}
+            {{ server.nodeinfo?.data?.error ?? "NodeInfo fetch failed" }}
           </p>
         </div>
       </div>

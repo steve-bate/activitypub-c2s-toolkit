@@ -41,8 +41,8 @@ onMounted(async () => {
     }
 
     const server = serverStore.servers.find(s => s.id === serverId)
-
-    if (!server || !server.authorizationServer.metadata || !server.oauth2) {
+    const authServerMetadata = server?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
+    if (!server || !authServerMetadata || !server.oauth2) {
       status.value = 'error'
       message.value = 'Server configuration not found'
       errorDetails.value = 'Unable to find server configuration. Please try again.'
@@ -63,7 +63,7 @@ onMounted(async () => {
     const exchange = await exchangeCodeForToken({
       serverId,
       authCode: callback.code,
-      serverMetadata: server.authorizationServer.metadata,
+      serverMetadata: authServerMetadata,
       oauth2Config: server.oauth2
     })
 
@@ -76,9 +76,8 @@ onMounted(async () => {
       message.value = 'Discovering actor information...'
       try {
         const actorResult = await discoverActor(
-          exchange.response.payload,
-          server.authorizationServer.metadata,
-          exchange.response.payload.access_token,
+          exchange.response.payload!,
+          authServerMetadata,
           server.oauth2.clientId,
           server.oauth2.clientSecret
         )

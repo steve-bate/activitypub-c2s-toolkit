@@ -7,7 +7,7 @@
  */
 
 import { TokenResponsePayload } from './authorizationService'
-import type { AuthorizationServerMetadata } from './authServerMetadataService'
+import type { AuthServerMetadata } from './authServerDiscoveryService'
 import { tryDecodeJWT } from '@/utils/jwt'
 
 export interface ActorProfile {
@@ -64,7 +64,7 @@ async function introspectToken(
   introspectionEndpoint: string,
   accessToken: string,
   clientId: string,
-  clientSecret: string
+  clientSecret?: string
 ): Promise<Actor | null> {
   try {
     console.debug('Attempting RFC 7662 token introspection')
@@ -216,21 +216,20 @@ async function fetchActorInfo(actorUri: string, accessToken?: string): Promise<{
  */
 export async function discoverActor(
   tokenResponse: TokenResponsePayload,
-  metadata: AuthorizationServerMetadata,
-  accessToken: string,
+  metadata: AuthServerMetadata,
   clientId: string,
-  clientSecret: string
+  clientSecret?: string
 ): Promise<ActorDiscoveryResult> {
   console.debug('Starting actor discovery')
 
   // Method 1: Check token response for "me" property
   let actor = getActorFromTokenResponse(tokenResponse)
   
-  if (!actor && metadata.links.oauth_introspect) {
+  if (!actor && metadata.introspection_endpoint) {
     // Method 2: Try RFC 7662 introspection
     actor = await introspectToken(
-      metadata.links.oauth_introspect,
-      accessToken,
+      metadata.introspection_endpoint,
+      tokenResponse.access_token,
       clientId,
       clientSecret
     )
@@ -238,18 +237,18 @@ export async function discoverActor(
   
   if (!actor) {
     // Method 3: Try Mastodon verify_credentials
-    actor = await getActorFromMastodon(metadata.links.api_base, accessToken)
+    actor = await getActorFromMastodon(metadata.issuer, tokenResponse.access_token)
   }
 
   // Method 4: Attempt to decode token as JWT
   try {
-    const jwtData = tryDecodeJWT(accessToken);
+    const jwtData = tryDecodeJWT(tokenResponse.access_token);
     if (jwtData) {
       console.debug("OAuthService: Decoded JWT:", jwtData);
       try {
           const actorUri = (jwtData.sub || jwtData.subject) as string;
           const actorProfile = await fetch(actorUri, {
-          headers: { Authorization: `Bearer ${accessToken}` },
+          headers: { Authorization: `Bearer ${tokenResponse.access_token}` },
           }).then((res) => res.json());
           actor = {
               uri: actorUri,
@@ -274,7 +273,7 @@ export async function discoverActor(
 
   // Always fetch full actor details from the actor URI to get complete information
   console.debug('Fetching complete actor document for URI:', actor.uri)
-  const actorInfoResult = await fetchActorInfo(actor.uri, accessToken)
+  const actorInfoResult = await fetchActorInfo(actor.uri, tokenResponse.access_token)
   
   if (!actorInfoResult.success) {
     // Actor URI was discovered but profile fetch failed

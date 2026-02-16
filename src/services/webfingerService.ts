@@ -9,6 +9,8 @@
  * - Other metadata about a user or resource
  */
 
+import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
+
 export interface WebFingerLink {
   rel: string
   type?: string
@@ -25,22 +27,22 @@ export interface WebFingerData {
   links?: WebFingerLink[]
 }
 
-export interface WebFingerResult {
-  success: boolean
-  actorUri?: string
-  webfinger?: WebFingerData
-  response?: Response
-  error?: string
+interface WebFingerParams {
+  resource: string
 }
 
+type WebFingerRequest = HttpRequestData<WebFingerParams>;
+type WebFingerResponse = HttpResponseData<WebFingerData>;
+export type WebFingerExchange = HttpExchange<WebFingerRequest, WebFingerResponse>;
+
 // Cache for WebFinger requests
-const cache = new Map<string, { data: WebFingerData; timestamp: number }>()
+const cache = new Map<string, { data: WebFingerExchange; timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 /**
  * Get cached data if available and not expired
  */
-function getCached(key: string): WebFingerData | null {
+function getCached(key: string): WebFingerExchange | null {
   const cached = cache.get(key)
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     return cached.data
@@ -51,7 +53,7 @@ function getCached(key: string): WebFingerData | null {
 /**
  * Set cache data
  */
-function setCache(key: string, data: WebFingerData): void {
+function setCache(key: string, data: WebFingerExchange): void {
   cache.set(key, { data, timestamp: Date.now() })
 }
 
@@ -98,18 +100,13 @@ function buildResourceUri(username: string, domain: string): string {
 /**
  * Fetch WebFinger information for a handle
  */
-async function fetchWebFinger(domain: string, resource: string): Promise<WebFingerResult> {
+async function fetchWebFinger(domain: string, resource: string): Promise<WebFingerExchange> {
   const cacheKey = `webfinger:${resource}`
   const cached = getCached(cacheKey)
   
   if (cached) {
     console.debug('Using cached WebFinger for', resource)
-    const actorUri = extractActorUri(cached)
-    return {
-      success: true,
-      actorUri,
-      webfinger: cached
-    }
+    return cached
   }
   
   try {
@@ -119,10 +116,12 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
     
     console.debug('Fetching WebFinger from', url.toString())
     
-    const response = await fetch(url.toString(), {
-      headers: {
+    const headers = {
         'Accept': 'application/jrd+json, application/json'
       }
+
+    const response = await fetch(url.toString(), {
+      headers: headers
     })
     
     if (!response.ok) {
@@ -130,7 +129,15 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
       return {
         success: false,
         error: `Failed to fetch WebFinger: HTTP ${response.status}`,
-        response
+        request: {
+          url: url.toString(),
+          headers: headers,
+          params: { resource }
+        },
+        response: {
+          status_code: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+        }
       }
     }
     
@@ -142,8 +149,16 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
       return {
         success: false,
         error: 'Invalid WebFinger response: missing subject field',
-        webfinger: data,
-        response
+        request: {
+          url: url.toString(),
+          headers: headers,
+          params: { resource }
+        },
+        response: {
+          status_code: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          payload: data
+        }
       }
     }
     
@@ -154,19 +169,36 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
       return {
         success: false,
         error: 'No ActivityPub actor URI found in WebFinger links',
-        webfinger: data,
-        response
+        request: {
+          url: url.toString(),
+          headers: headers,
+          params: { resource }
+        },
+        response: {
+          status_code: response.status,
+          headers: Object.fromEntries(response.headers.entries()),
+          payload: data
+        }
       }
     }
     
-    setCache(cacheKey, data)
-    
-    return {
+    const exchange = {
       success: true,
-      actorUri,
-      webfinger: data,
-      response
+      request: {
+        url: url.toString(),
+        headers: headers,
+        params: { resource }
+      },
+      response: {
+        status_code: response.status,
+        headers: Object.fromEntries(response.headers.entries()),
+        payload: data
+      }
     }
+
+    setCache(cacheKey, exchange)
+    
+    return exchange
   } catch (error) {
     console.debug('WebFinger fetch error:', error)
     return {
@@ -210,31 +242,24 @@ function extractActorUri(webfinger: WebFingerData): string | undefined {
  * 
  * @param handle - The fediverse handle (e.g., "@user@server.com" or "user@server.com")
  * @returns WebFingerResult containing the actor URI, full WebFinger data, and response
- * 
- * @example
- * const result = await resolveHandle('@alice@mastodon.social')
- * if (result.success) {
- *   console.log('Actor URI:', result.actorUri)
- *   console.log('WebFinger:', result.webfinger)
- * }
  */
-export async function resolveHandle(handle: string): Promise<WebFingerResult> {
+export async function resolveHandle(handle: string): Promise<string | undefined> {
   console.debug('Resolving handle:', handle)
   
   // Parse the handle
   const parsed = parseHandle(handle)
   if (!parsed) {
-    return {
-      success: false,
-      error: 'Invalid handle format. Expected format: @user@domain.com or user@domain.com'
-    }
+    return
   }
   
   const { username, domain } = parsed
   const resource = buildResourceUri(username, domain)
   
   // Fetch WebFinger information
-  return await fetchWebFinger(domain, resource)
+  const exchange = await fetchWebFinger(domain, resource)
+  if (exchange.success && exchange.response?.payload) {
+    return extractActorUri(exchange.response.payload)
+  }
 }
 
 /**

@@ -4,8 +4,8 @@ import { useRouter } from 'vue-router'
 import { useServerStore } from '@/stores/serverStore'
 import OAuth2InitiateFlow from '@/components/server/OAuth2InitiateFlow.vue'
 import BearerTokenForm from '@/components/server/BearerTokenForm.vue'
-import { parseServerIdentifier, discoverServerMetadata, ServerInfo, DiscoveryMethod, AuthorizationServerMetadata } from '@/services/authServerMetadataService'
-import { registerClient, createDefaultClientMetadata } from '@/services/clientRegistrationService'
+import { parseUrl, discoverServerMetadata, AuthServerDiscoveryResult, UrlComponents } from '@/services/authServerDiscoveryService'
+import { registerClient, defaultClientRegistrationParams } from '@/services/clientRegistrationService'
 
 const router = useRouter()
 const serverStore = useServerStore()
@@ -20,7 +20,7 @@ const identifier = ref('')
 const discoveryError = ref(null)
 const isDiscovering = ref(false)
 const isRegistering = ref(false)
-const registrationError = ref(null)
+const registrationError = ref<string | null>(null)
 
 /**
  * Handle auth type selection
@@ -46,21 +46,23 @@ async function handleIdentifierSubmit() {
 
   try {
     // Attempt RFC 8414 discovery
-    const result = await discoverServerMetadata(identifier.value)
+    const serverUrl = parseUrl(identifier.value)
+    const result = await discoverServerMetadata(serverUrl)
 
-    if (result.success) {
+    if (result.exchange.success) {
       // Success - use discovered metadata
-      console.log('Discovery successful:', result.metadata)
-      const serverInfo = result.serverInfo
-      await createServerWithMetadata(serverInfo, result.metadata, result.discoveryMethod)
+      console.log('Auth Server discovery successful', result)
+      await createServerWithAuthDiscoveryResult(serverUrl, result)
     } else {
       // Discovery failed - show form for manual configuration
-      discoveryError.value = result.error
+      // FIXME
+      // discoveryError.value = result.error
       step.value = 'edit'
     }
   } catch (error) {
     console.error('Discovery error:', error)
-    discoveryError.value = error.message
+    //FIXME
+    //discoveryError.value = error.message
     step.value = 'edit'
   } finally {
     isDiscovering.value = false
@@ -70,16 +72,15 @@ async function handleIdentifierSubmit() {
 /**
  * Create server with discovered metadata and auto-register if possible
  */
-async function createServerWithMetadata(
-  serverInfo: ServerInfo, 
-  metadata: AuthorizationServerMetadata, 
-  discoveryMethod?: DiscoveryMethod
+async function createServerWithAuthDiscoveryResult(
+  serverUrl: UrlComponents,
+  authDiscoveryResult: AuthServerDiscoveryResult
 ) {
   // Create the server first
-  const newServer = serverStore.addServer({
+  const server = serverStore.addServer({
     identifier: identifier.value,
-    name: serverInfo.hostname,
-    baseUrl: serverInfo.baseUrl,
+    name: serverUrl.hostname,
+    baseUrl: serverUrl.baseUrl,
     authType: 'oauth2',
     oauth2: {
       clientId: '',
@@ -88,86 +89,58 @@ async function createServerWithMetadata(
     }
   })
 
-  if (metadata) {
-    serverStore.saveDiscoveryMetadata(newServer.id, metadata, {
-      method: discoveryMethod as 'RFC8414' | 'Mastodon' | 'Manual',
-      statusCode: 200
-    })
+  serverStore.saveAuthServerDiscoveryResult(server.id, authDiscoveryResult)
 
-    // Attempt automatic client registration if supported
-    step.value = 'registering'
-    isRegistering.value = true
-    registrationError.value = null
+  // Attempt automatic client registration if supported
+  step.value = 'registering'
+  isRegistering.value = true
+  registrationError.value = null
 
-    try {
-      const clientMetadata = createDefaultClientMetadata(
-        serverInfo.hostname,
-        redirectUri.value,
-      )
+  try {
+    const clientMetadata = defaultClientRegistrationParams(
+      serverUrl.hostname,
+      [redirectUri.value],
+    )
 
-      const registrationResult = await registerClient(
-        serverInfo,
-        metadata.links.registration_endpoint!,
-        clientMetadata
-      )
-
-      // Save registration exchange even on failure so user can see what went wrong
-      if (registrationResult.requestData) {
-        serverStore.updateServerProperty(newServer.id, 'oauth2', {
-          clientId: '',
-          clientSecret: '',
-          redirectUri: redirectUri.value,
-          scopes: 'read write follow',
-          registrationExchange: {
-            request: registrationResult.requestData,
-            response: registrationResult.data || { error: registrationResult.error },
-            timestamp: new Date().toISOString(),
-            requestHeaders: registrationResult.requestHeaders,
-            requestUrl: registrationResult.requestUrl,
-            httpMeta: registrationResult.httpMeta,
-            responseRaw: registrationResult.responseRaw
-          }
-        })
-      }
-      
-      if (registrationResult.success && registrationResult.data) {
-        // Update server with registration response
-        serverStore.updateServerProperty(newServer.id, 'oauth2', {
-          clientId: registrationResult.data.client_id,
-          clientSecret: registrationResult.data.client_secret || '',
-          redirectUri: registrationResult.data.redirect_uris?.[0] || redirectUri.value,
-          registrationMethod: registrationResult.registrationMethod || 'Manual'
-        })
-        console.log('Client registration successful')
-      } else {
-        console.warn('Client registration failed:', registrationResult.error)
-        registrationError.value = registrationResult.error
-      }
-      
-      // Navigate to server detail page to show exchange details (success or failure)
-      step.value = 'success'
-      serverStore.markServerForAutoAuth(newServer.id)
-      serverStore.setActiveServer(newServer.id)
-      
-      setTimeout(() => {
-        void router.push(`/servers/${newServer.id}`)
-      }, 1000)
-    } catch (error) {
-      console.error('Client registration error:', error)
-      registrationError.value = error.message
-    } finally {
-      isRegistering.value = false
+    if (authDiscoveryResult.discoveryMethod === 'Mastodon') {
+      clientMetadata.redirect_uris = clientMetadata.redirect_uris[0] // Mastodon expects single string
     }
+    
+    const registrationEndpoint = authDiscoveryResult.exchange.response?.payload?.registration_endpoint;
+    
+    const registrationResult = await registerClient(
+      serverUrl,
+      registrationEndpoint,
+      clientMetadata
+    )
+
+    serverStore.updateServerProperty(server.id, 'auth.oauth2.clientRegistration', registrationResult)
+
+    // TODO temporary hack to support refactoring
+
+    server.oauth2 = {
+      ...server.oauth2,
+      clientId: registrationResult.exchange.response?.payload?.client_id || '',
+      clientSecret: registrationResult.exchange.response?.payload?.client_secret || '',
+      redirectUri: redirectUri.value,
+      scopes: 'read write follow'
+    }
+    serverStore.updateServerProperty(server.id, 'oauth2', server.oauth2)
+
+  } catch (error) {
+    console.error('Client registration error:', error)
+    registrationError.value = error instanceof Error ? error.message : String(error)
+  } finally {
+    isRegistering.value = false
   }
 
+  // Navigate to server detail page to show exchange details (success or failure)
   step.value = 'success'
-  
-  // Set as active server and navigate to detail page
-  serverStore.markServerForAutoAuth(newServer.id)
-  serverStore.setActiveServer(newServer.id)
+  serverStore.markServerForAutoAuth(server.id)
+  serverStore.setActiveServer(server.id)
   
   setTimeout(() => {
-    void router.push(`/servers/${newServer.id}`)
+    void router.push(`/servers/${server.id}`)
   }, 1000)
 }
 
@@ -175,7 +148,7 @@ async function createServerWithMetadata(
  * Handle bearer token form submission
  */
 function handleBearerTokenSave(formData: { identifier: string; name: string; bearerToken: string }) {
-  const serverInfo = parseServerIdentifier(formData.identifier)
+  const serverInfo = parseUrl(formData.identifier)
 
   const newServer = serverStore.addServer({
     identifier: formData.identifier,
@@ -190,7 +163,7 @@ function handleBearerTokenSave(formData: { identifier: string; name: string; bea
     }
   })
 
-  serverStore.setAuthStatus(newServer.id, 'configured')
+  serverStore.setAuthStatus(newServer.id, 'authorized')
 
   step.value = 'success'
 
@@ -212,8 +185,10 @@ function handleBearerTokenCancel() {
 /**
  * Handle manual form submission
  */
+// FIXME
+// @ts-expect-error FIXME
 function handleFormSave(formData) {
-  const serverInfo = parseServerIdentifier(formData.identifier)
+  const serverInfo = parseUrl(formData.identifier)
 
   const newServer = serverStore.addServer({
     identifier: formData.identifier,
@@ -415,10 +390,11 @@ function handleBackToIdentifier() {
         </div>
 
         <OAuth2InitiateFlow
+          v-if="step === 'edit' && identifier.trim()"
           :server="{
             identifier,
             name: '',
-            baseUrl: parseServerIdentifier(identifier).baseUrl,
+            baseUrl: parseUrl(identifier).baseUrl,
             authType: 'oauth2',
             oauth2: {
               clientId: '',

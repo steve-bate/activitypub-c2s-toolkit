@@ -134,7 +134,7 @@ watch(
     }
 
     // If the current server doesn't have token/metadata, try to discover actor
-    if (!server.tokenResponse || !server.authorizationServer.metadata) {
+    if (!server.tokenResponse || !server.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload) {
       return
     }
 

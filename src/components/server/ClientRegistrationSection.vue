@@ -37,6 +37,7 @@ const isRetrying = ref(false)
 onMounted(() => {
   updateViewMode()
   updateRegistrationError()
+  updateRegistrationSuccess()
 })
 
 // Watch for changes in registration method
@@ -49,10 +50,20 @@ watch(() => props.server.oauth2?.registrationError, () => {
   updateRegistrationError()
 })
 
+// Watch for changes in client registration
+watch(() => props.server.auth?.oauth2?.clientRegistration?.exchange.success, () => {
+  updateRegistrationSuccess()
+})
+
 function updateRegistrationError() {
-  if (props.server.oauth2?.registrationError) {
-    registrationError.value = props.server.oauth2.registrationError
+  if (props.server.auth?.oauth2?.clientRegistration?.exchange.error) {
+    registrationError.value = props.server.auth.oauth2.clientRegistration.exchange.error
   }
+}
+
+function updateRegistrationSuccess() {
+  // Show success if we have client credentials and no error
+  registrationSuccess.value = props.server.auth?.oauth2?.clientRegistration?.exchange.success ?? false
 }
 
 function updateViewMode() {
@@ -77,23 +88,27 @@ function handleRetryRegistration() {
 }
 
 const registrationExchange = computed(() => {
-  return props.server.oauth2?.registrationExchange
+  return props.server.auth?.oauth2?.clientRegistration?.exchange
+})
+
+// const registrationData = computed(() => {
+//   return registrationExchange.value?.response?.payload
+// });
+
+const registrationMethod = computed(() => {
+  return props.server.auth?.oauth2?.clientRegistration?.registrationMethod;
 })
 
 const requestHeaders = computed(() => {
-  return registrationExchange.value?.requestHeaders || null
+  return registrationExchange.value?.request?.headers || null
 })
 
 const responseHeaders = computed(() => {
-  return registrationExchange.value?.httpMeta?.headers || null
+  return registrationExchange.value?.response?.headers || null
 })
 
 const responseStatus = computed(() => {
-  return registrationExchange.value?.httpMeta?.status ?? null
-})
-
-const responseStatusText = computed(() => {
-  return registrationExchange.value?.httpMeta?.statusText ?? null
+  return registrationExchange.value?.response?.status_code ?? null
 })
 
 const requestContentType = computed(() => {
@@ -107,6 +122,7 @@ const responseContentType = computed(() => {
   const entry = Object.entries(responseHeaders.value).find(([key]) => key.toLowerCase() === 'content-type')
   return entry ? entry[1] : null
 })
+
 
 
 function copyToClipboard(text: string) {
@@ -140,9 +156,6 @@ function handleSavePreregisteredClient() {
     preregClientId.value = ''
     preregClientSecret.value = ''
     
-    setTimeout(() => {
-      preregSuccess.value = null
-    }, 3000)
   } catch (error) {
     preregError.value = (error instanceof Error ? error.message : 'Failed to save pre-registered client')
   } finally {
@@ -176,6 +189,16 @@ function switchToDynamic() {
   <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm p-6">
     <div class="flex items-center justify-between mb-4">
       <h3 class="text-lg font-medium text-gray-900 dark:text-gray-100">Client Registration</h3>
+      <span
+        v-if="registrationSuccess"
+        class="px-4 py-2 bg-green-100 dark:bg-green-900/30 text-green-800 dark:text-green-200 text-sm font-medium rounded-md flex items-center gap-2"
+        title="Client registered successfully"
+      >
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+        </svg>
+        Registered
+      </span>
       <!-- FIXME: Re-enable client registration button when handleRegisterClient is implemented -->
     </div>
 
@@ -203,21 +226,62 @@ function switchToDynamic() {
 
     <!-- Dynamic Registration View -->
     <div v-if="viewMode === 'dynamic'">
-      <div v-if="registrationSuccess" class="mb-4 p-4 bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800 rounded-lg">
-        <div class="flex items-start gap-2">
-          <svg class="w-5 h-5 text-green-600 dark:text-green-400 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-          </svg>
-          <div>
-            <p class="text-sm font-medium text-green-800 dark:text-green-200">
-              Client registered successfully!
-            </p>
-            <p class="text-xs text-green-700 dark:text-green-300 mt-1">
-              Your client credentials have been updated below.
-            </p>
-          </div>
+      <!-- <div class="ml-auto mt-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Client Name
+        </label>
+        <div class="flex items-center gap-2">
+          <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 break-all">
+            {{ registrationData?.client_name ?? registrationData?.name ?? 'Not defined'  }}
+          </code>
+          <button
+            v-if="registrationData?.client_name || registrationData?.name"
+            @click="copyToClipboard(registrationData?.client_name ?? registrationData?.name ?? '')"
+            class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            title="Copy to clipboard"
+          >
+            <CopyIcon class="w-4 h-4" />
+          </button>
         </div>
       </div>
+
+      <div class="ml-auto mt-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Client ID
+        </label>
+        <div class="flex items-center gap-2">
+          <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 break-all">
+            {{ registrationData?.client_id ?? 'Not defined'  }}
+          </code>
+          <button
+            v-if="registrationData?.client_id"
+            @click="copyToClipboard(registrationData?.client_id ?? '')"
+            class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            title="Copy to clipboard"
+          >
+            <CopyIcon class="w-4 h-4" />
+          </button>
+        </div>
+      </div>
+
+      <div class="ml-auto mt-4">
+        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+          Client Secret
+        </label>
+        <div class="flex items-center gap-2">
+          <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 break-all">
+            {{ registrationData?.client_secret ?? 'Not defined'  }}
+          </code>
+          <button
+            v-if="registrationData?.client_secret"
+            @click="copyToClipboard(registrationData?.client_name ?? registrationData?.name ?? '')"
+            class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
+            title="Copy to clipboard"
+          >
+            <CopyIcon class="w-4 h-4" />
+          </button>
+        </div>
+      </div> -->
 
       <!-- Error Message -->
       <div v-if="registrationError" class="mb-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
@@ -258,27 +322,27 @@ function switchToDynamic() {
       </div>
 
       <!-- Registration Method Badge (for dynamic registration) -->
-      <div v-if="server.oauth2 && server.oauth2.registrationMethod !== 'Manual' && server.oauth2.clientId" class="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+      <div v-if="registrationMethod !== 'Manual' && server.oauth2.clientId" class="flex items-center gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
         <span class="text-sm text-gray-600 dark:text-gray-400">Registration Method:</span>
         <span 
           class="px-3 py-1 rounded-full text-xs font-semibold"
           :class="{
-            'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200': server.oauth2.registrationMethod === 'RFC7591',
-            'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200': server.oauth2.registrationMethod === 'Mastodon'
+            'bg-blue-100 dark:bg-blue-900/30 text-blue-800 dark:text-blue-200': registrationMethod === 'RFC7591',
+            'bg-purple-100 dark:bg-purple-900/30 text-purple-800 dark:text-purple-200': registrationMethod === 'Mastodon'
           }"
         >
-          {{ server.oauth2.registrationMethod }}
+          {{ registrationMethod }}
         </span>
-        <span v-if="server.oauth2.registrationMethod === 'RFC7591'" class="text-xs text-gray-500 dark:text-gray-400">
+        <span v-if="registrationMethod === 'RFC7591'" class="text-xs text-gray-500 dark:text-gray-400">
           (Standard Dynamic Client Registration)
         </span>
-        <span v-else-if="server.oauth2.registrationMethod === 'Mastodon'" class="text-xs text-gray-500 dark:text-gray-400">
+        <span v-else-if="registrationMethod === 'Mastodon'" class="text-xs text-gray-500 dark:text-gray-400">
           (Mastodon API /api/v1/apps)
         </span>
       </div>
 
       <!-- Client Credentials Section (showing for both dynamic and pre-registered) -->
-      <div v-if="server.oauth2 && server.oauth2.clientId" class="space-y-4">
+      <div v-if="server.auth?.oauth2?.clientRegistration?.exchange.response?.payload?.client_id" class="space-y-4">
         <!-- Client ID -->
         <div>
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -371,22 +435,10 @@ function switchToDynamic() {
         </div>
       </div>
 
-      <!-- Token Endpoint Auth Method -->
-      <div>
-        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-          Token Endpoint Auth Method
-        </label>
-        <div v-if="!editable && server.oauth2.registrationExchange?.response?.token_endpoint_auth_method" class="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-sm text-gray-900 dark:text-gray-100">
-          {{ server.oauth2.registrationExchange.response.token_endpoint_auth_method }}
-        </div>
-        <div v-else class="text-sm text-gray-500 dark:text-gray-400 italic">
-          Not configured
-        </div>
-      </div>
       </div>
 
       <!-- HTTP Registration Exchange (only for dynamic registration) -->
-      <div v-if="registrationExchange && server.oauth2?.registrationMethod !== 'Manual'" class="pt-4 border-t border-gray-200 dark:border-gray-700">
+      <div v-if="registrationExchange && server.auth?.oauth2?.clientRegistration?.registrationMethod !== 'Manual'" class="pt-4 border-t border-gray-200 dark:border-gray-700">
         <details class="group">
           <summary class="cursor-pointer list-none">
             <div class="flex items-center gap-2 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100">
@@ -400,24 +452,17 @@ function switchToDynamic() {
             <HttpRequestPanel
               title="Request"
               :headers="requestHeaders"
-              :url="registrationExchange.requestUrl"
-              :payload="registrationExchange.request"
+              :url="registrationExchange.request?.url"
+              :payload="registrationExchange.request?.params"
               :content-type="requestContentType"
             />
             <HttpResponsePanel
               title="Response"
               :status="responseStatus"
-              :status-text="responseStatusText"
               :headers="responseHeaders"
-              :payload="registrationExchange.response"
-              :payload-raw="registrationExchange.responseRaw"
+              :payload="registrationExchange.response?.payload"
               :content-type="responseContentType"
             />
-
-            <!-- Timestamp -->
-            <div class="text-xs text-gray-500 dark:text-gray-400 px-2 py-1">
-              Registered: {{ new Date(registrationExchange.timestamp).toLocaleString() }}
-            </div>
           </div>
         </details>
       </div>

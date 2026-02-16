@@ -1,19 +1,20 @@
 import { defineStore } from 'pinia'
 import { ref, computed, Ref } from 'vue'
-import type { AuthorizationServerMetadata } from '@/services/authServerMetadataService'
-import type { Actor } from '@/services/actorDiscoveryService'
-import type { NodeInfo, NodeInfoIndex } from '@/services/nodeinfoService'
-import type { WebFingerData } from '@/services/webfingerService'
+import type { AuthServerDiscoveryResult, AuthServerMetadata } from '@/services/authServerDiscoveryService'
+import type { NodeInfo, NodeInfoDataExchange, NodeInfoIndex, NodeInfoIndexExchange } from '@/services/nodeinfoService'
+import type { WebFingerData, WebFingerExchange } from '@/services/webfingerService'
 import { TokenExchangeHttpExchange, TokenResponsePayload } from '@/services/authorizationService'
+import { Actor } from '@/services/actorDiscoveryService'
+import { ClientRegistrationMethod, ClientRegistrationResult } from '@/services/clientRegistrationService'
 
-export type { AuthorizationServerMetadata as ServerMetadata, Actor, NodeInfo, NodeInfoIndex, WebFingerData as WebFingerResponse }
+export type { AuthServerMetadata as ServerMetadata, NodeInfo, NodeInfoIndex, WebFingerData as WebFingerResponse }
 
 const STORAGE_KEY = 'c2s_servers'
 const AUTO_AUTH_KEY = 'c2s_auto_auth_server_id'
 
-export type AuthStatus = 'not-configured' | 'discovering' | 'configured' | 'authorized' | 'token-expired'
+// TODO Review these statuses
+export type AuthStatus = 'not-configured' | 'discovering-authserver' | 'authserver-configured' | 'authorized' | 'token-expired' | 'configured'
 export type AuthType = 'oauth2' | 'bearer'
-export type RegistrationMethod = 'RFC7591' | 'Mastodon' | 'Manual'
 
 export interface HttpMeta {
   status: number
@@ -27,7 +28,8 @@ interface TokenEndpointMetadata {
 }
 export interface RegistrationExchange {
   request: object
-  response: TokenEndpointMetadata
+  // FIXME
+  response?: TokenEndpointMetadata
   timestamp: string
   requestHeaders?: Record<string, string>
   requestUrl?: string
@@ -40,18 +42,38 @@ export interface OAuth2Config {
   clientSecret: string
   redirectUri: string
   scopes: string
-  registrationMethod?: RegistrationMethod
+  registrationMethod?: ClientRegistrationMethod
   registrationExchange?: RegistrationExchange
   registrationError?: string
 }
 
 export interface AuthorizationServerInfo {
-  metadata: AuthorizationServerMetadata | null
+  metadata: AuthServerMetadata | null
   method?: 'RFC8414' | 'Mastodon' | 'Manual'
   status_code?: number
   error?: string
 }
 
+// ...
+// auth
+// nodeinfo
+// webfinger
+// actor
+
+
+export interface NodeInfoData {
+  index: NodeInfoIndexExchange | null
+  data: NodeInfoDataExchange | null
+}
+
+export interface OAuth2Data {
+  authServerDiscovery?: AuthServerDiscoveryResult
+  clientRegistration?: ClientRegistrationResult
+}
+
+export interface AuthData {
+  oauth2?: OAuth2Data
+}
 export interface ResourceServerMetadata {
   id: string // generated unique ID for this server configuration
   name: string
@@ -61,7 +83,6 @@ export interface ResourceServerMetadata {
   authStatus: AuthStatus
   bearerToken: string | null
 
-
   // Timestamps
   createdAt: string
   lastUsed: string | null
@@ -69,19 +90,19 @@ export interface ResourceServerMetadata {
   // User input for OAuth2 flow
   identifier: string
 
+  auth?: AuthData
+
+  // TODO Remove
   oauth2: OAuth2Config
-  authorizationServer: AuthorizationServerInfo
+
   authCode: string | null
   tokenResponse: TokenResponsePayload | null
   tokenExchange?: TokenExchangeHttpExchange
   actor?: Actor
   actorError?: string
-  nodeinfo?: NodeInfo
-  nodeinfoIndex?: NodeInfoIndex
-  nodeinfoError?: string
-  webfinger?: WebFingerData
-  webfingerActorUri?: string
-  webfingerError?: string
+  nodeinfo?: NodeInfoData
+  // TODO Not sure if this is used`
+  webfinger?: WebFingerExchange
 }
 
 export interface ServerInput {
@@ -160,14 +181,6 @@ export const useServerStore = defineStore('server', () => {
       // Bearer token configuration
       bearerToken: serverData.bearerToken || null,
       
-      // Authorization server discovery
-      authorizationServer: {
-        metadata: null,
-        method: undefined,
-        status_code: undefined,
-        error: undefined
-      },
-      
       // OAuth2 authorization endpoint response
       authCode: null,
       
@@ -194,28 +207,45 @@ export const useServerStore = defineStore('server', () => {
   }
 
   /**
-   * Update nested server properties
+   * Update nested server properties using dot-separated path
    */
   function updateServerProperty<K extends keyof ResourceServerMetadata>(
     id: string, 
-    property: K, 
-    value: ResourceServerMetadata[K]
+    propertyPath: K | string, 
+    value: unknown
   ): ResourceServerMetadata | null {
     const index = servers.value.findIndex(s => s.id === id)
-    if (index !== -1) {
-      const server = servers.value[index]
-      const currentValue = server[property]
-      if (typeof currentValue === 'object' && currentValue !== null && typeof value === 'object' && value !== null) {
-        // Update object properties by merging
-        server[property] = { ...currentValue, ...value } as ResourceServerMetadata[K]
-      } else {
-        // Direct assignment for primitive values
-        server[property] = value
-      }
-      persistServers()
-      return servers.value[index]
+    if (index === -1) {
+      return null
     }
-    return null
+
+    const server = servers.value[index]
+    const pathParts = String(propertyPath).split('.')
+    
+    if (pathParts.length === 1) {
+      // Simple property update
+      server[propertyPath as K] = value as ResourceServerMetadata[K]
+    } else {
+      // Nested property update using dot-separated path
+      let current = server as unknown as Record<string, unknown>
+      
+      // Navigate to the parent of the target property
+      for (let i = 0; i < pathParts.length - 1; i++) {
+        const part = pathParts[i]
+        if (current[part] === undefined || current[part] === null) {
+          // Create intermediate object if it doesn't exist
+          current[part] = {}
+        }
+        current = current[part] as Record<string, unknown>
+      }
+      
+      // Set the final property
+      const lastPart = pathParts[pathParts.length - 1]
+      current[lastPart] = value
+    }
+    
+    persistServers()
+    return servers.value[index]
   }
 
   /**
@@ -271,39 +301,19 @@ export const useServerStore = defineStore('server', () => {
   /**
    * Save RFC 8414 discovery metadata with method and response details
    */
-  function saveDiscoveryMetadata(serverId: string, metadata: AuthorizationServerMetadata, options?: { method?: 'RFC8414' | 'Mastodon' | 'Manual', statusCode?: number }): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
+  function saveAuthServerDiscoveryResult(
+    serverId: string,
+    discoveryResult: AuthServerDiscoveryResult,
+  ): ResourceServerMetadata | null {
+    const server = servers.value.find((s) => s.id === serverId);
     if (server) {
-      server.authorizationServer.metadata = metadata
-      if (options?.method) {
-        server.authorizationServer.method = options.method
-      }
-      if (options?.statusCode) {
-        server.authorizationServer.status_code = options.statusCode
-      }
-      server.authorizationServer.error = undefined
+      updateServerProperty(serverId, 'auth.oauth2.authServerDiscovery', discoveryResult)
       persistServers()
       return server
     }
     return null
   }
 
-  /**
-   * Save discovery error with HTTP status code
-   */
-  function saveDiscoveryError(serverId: string, error: string, statusCode?: number): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
-    if (server) {
-      server.authorizationServer.error = error
-      if (statusCode) {
-        server.authorizationServer.status_code = statusCode
-      }
-      server.authorizationServer.metadata = null
-      persistServers()
-      return server
-    }
-    return null
-  }
 
   /**
    * Save authorization code from OAuth2 flow
@@ -388,29 +398,21 @@ export const useServerStore = defineStore('server', () => {
   /**
    * Save NodeInfo information
    */
-  function saveNodeInfo(serverId: string, nodeinfo: NodeInfo, index: NodeInfoIndex): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
+  function saveNodeInfo(
+    serverId: string,
+    dataExchange?: NodeInfoDataExchange,
+    indexExchange?: NodeInfoIndexExchange,
+  ): ResourceServerMetadata | null {
+    const server = servers.value.find((s) => s.id === serverId);
     if (server) {
-      server.nodeinfo = nodeinfo
-      server.nodeinfoIndex = index
-      server.nodeinfoError = undefined
-      persistServers()
-      return server
+      server.nodeinfo = {
+        index: indexExchange || null,
+        data: dataExchange || null
+      };
+      persistServers();
+      return server;
     }
-    return null
-  }
-
-  /**
-   * Save NodeInfo error
-   */
-  function saveNodeInfoError(serverId: string, error: string): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
-    if (server) {
-      server.nodeinfoError = error
-      persistServers()
-      return server
-    }
-    return null
+    return null;
   }
 
   /**
@@ -420,36 +422,6 @@ export const useServerStore = defineStore('server', () => {
     const server = servers.value.find(s => s.id === serverId)
     if (server) {
       server.nodeinfo = undefined
-      server.nodeinfoIndex = undefined
-      server.nodeinfoError = undefined
-      persistServers()
-      return server
-    }
-    return null
-  }
-
-  /**
-   * Save WebFinger information
-   */
-  function saveWebFinger(serverId: string, webfinger: WebFingerData, actorUri: string): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
-    if (server) {
-      server.webfinger = webfinger
-      server.webfingerActorUri = actorUri
-      server.webfingerError = undefined
-      persistServers()
-      return server
-    }
-    return null
-  }
-
-  /**
-   * Save WebFinger error
-   */
-  function saveWebFingerError(serverId: string, error: string): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
-    if (server) {
-      server.webfingerError = error
       persistServers()
       return server
     }
@@ -463,8 +435,6 @@ export const useServerStore = defineStore('server', () => {
     const server = servers.value.find(s => s.id === serverId)
     if (server) {
       server.webfinger = undefined
-      server.webfingerActorUri = undefined
-      server.webfingerError = undefined
       persistServers()
       return server
     }
@@ -482,9 +452,9 @@ export const useServerStore = defineStore('server', () => {
     setActiveServer,
     markServerForAutoAuth,
     consumeAutoAuthForServer,
-    saveDiscoveryMetadata,
-    saveDiscoveryError,
+    saveDiscoveryMetadata: saveAuthServerDiscoveryResult,
     saveAuthCode,
+    saveAuthServerDiscoveryResult,
     saveTokenResponse: saveTokenExchange,
     saveActorInfo,
     saveActorError,
@@ -492,10 +462,7 @@ export const useServerStore = defineStore('server', () => {
     clearToken,
     setAuthStatus,
     saveNodeInfo,
-    saveNodeInfoError,
     clearNodeInfo,
-    saveWebFinger,
-    saveWebFingerError,
     clearWebFinger
   }
 })

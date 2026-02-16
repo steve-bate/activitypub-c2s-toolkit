@@ -21,8 +21,8 @@ const authError = ref<string | null>(null)
 const authSuccess = ref(false)
 
 const canAuthorize = computed(() => {
-  return props.server.authorizationServer?.metadata?.links?.oauth_authorize &&
-         props.server.oauth2?.clientId &&
+  return props.server.auth?.oauth2?.authServerDiscovery?.exchange.response?.payload?.authorization_endpoint &&
+         props.server.auth?.oauth2?.clientRegistration?.exchange?.response?.payload?.client_id &&
          props.server.oauth2?.redirectUri
 })
 
@@ -43,7 +43,7 @@ const authRequestParams = computed(() => {
     authRequest.scope = props.server.oauth2.scopes
   }
 
-  if (props.server.authorizationServer?.metadata?.features?.codeChallengeMethodsSupported?.length) {
+  if (props.server.auth?.oauth2?.authServerDiscovery?.exchange.response?.payload?.code_challenge_methods_supported?.length) {
     authRequest.code_challenge = '(SHA-256 hash of code_verifier)'
     authRequest.code_challenge_method = 'S256'
   }
@@ -54,7 +54,7 @@ const authRequestParams = computed(() => {
 })
 
 const authRequestUrl = computed(() => {
-  const baseUrl = props.server.authorizationServer?.metadata?.links?.oauth_authorize
+  const baseUrl = props.server.auth?.oauth2?.authServerDiscovery?.exchange.response?.payload?.authorization_endpoint
   const params = authRequestParams.value
   if (!baseUrl || !params) return null
 
@@ -105,11 +105,17 @@ async function handleAuthorize() {
   try {
     console.log('Initiating authorization flow for server:', props.server.id)
     
-    await initiateAuthorizationFlow({
-      serverId: props.server.id,
-      serverMetadata: props.server.authorizationServer.metadata!,
-      oauth2Config: props.server.oauth2
-    })
+    const metadata = props.server.auth?.oauth2?.authServerDiscovery?.exchange.response?.payload;
+
+    if (metadata) {
+      await initiateAuthorizationFlow({
+        serverId: props.server.id,
+        serverMetadata: metadata,
+        oauth2Config: props.server.oauth2
+      })
+    } else {
+      throw new Error('Missing authorization server metadata. Please ensure the authorization endpoint is discovered and try again.')
+    }
     
     // This will redirect, so we shouldn't reach here
   } catch (error) {
@@ -230,8 +236,8 @@ async function handleReauthorize() {
           </p>
           <p class="text-xs text-yellow-700 dark:text-yellow-300 mt-1">
             Please ensure:
-            <span v-if="!server.authorizationServer?.metadata?.links?.oauth_authorize"> Authorization server metadata is discovered.</span>
-            <span v-if="!server.oauth2?.clientId"> Client is registered.</span>
+            <span v-if="!server.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload?.authorization_endpoint"> Authorization server metadata is discovered.</span>
+            <span v-if="!server.auth?.oauth2?.clientRegistration?.exchange?.response?.payload?.client_id"> Client is registered.</span>
             <span v-if="!server.oauth2?.redirectUri"> Redirect URI is configured.</span>
           </p>
         </div>
@@ -240,16 +246,16 @@ async function handleReauthorize() {
 
     <div class="space-y-4">
       <!-- Authorization Endpoint -->
-      <div v-if="server.authorizationServer?.metadata?.links?.oauth_authorize">
+      <div v-if="server.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload?.authorization_endpoint">
         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
           Authorization Endpoint
         </label>
         <div class="flex items-center gap-2">
           <code class="flex-1 px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 break-all">
-            {{ server.authorizationServer.metadata.links.oauth_authorize }}
+            {{ server.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload?.authorization_endpoint }}
           </code>
           <button
-            @click="copyToClipboard(server.authorizationServer.metadata.links.oauth_authorize)"
+            @click="copyToClipboard(server.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload?.authorization_endpoint)"
             class="p-2 text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-gray-100"
             title="Copy to clipboard"
           >

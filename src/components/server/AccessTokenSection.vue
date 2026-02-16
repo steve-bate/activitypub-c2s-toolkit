@@ -184,14 +184,14 @@ onUnmounted(() => {
             title="Request"
             :url="server.tokenExchange.request.url"
             :headers="server.tokenExchange.request.headers"
-            :payload="server.tokenExchange.request"
+            :payload="server.tokenExchange.request.params"
             content-type="application/x-www-form-urlencoded"
           />
           <HttpResponsePanel
             title="Response"
             :status="server.tokenExchange.response?.status_code"
             :headers="server.tokenExchange.response?.headers"
-            :payload="server.tokenResponse"
+            :payload="server.tokenExchange.response?.payload"
             content-type="application/json"
           />
           <!-- Timestamp -->

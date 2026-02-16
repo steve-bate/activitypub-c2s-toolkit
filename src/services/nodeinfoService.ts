@@ -10,6 +10,8 @@
  * - Other server information
  */
 
+import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
+
 export interface NodeInfoLink {
   rel: string
   href: string
@@ -59,20 +61,21 @@ export interface NodeInfoIndexResult {
   httpRequest?: HttpRequestResult
 }
 
-export interface NodeInfoDataResponse {
-  status: 'success' | 'error'
-  data?: NodeInfo
-  error?: string
-  httpRequest?: HttpRequestResult
-}
-
 export interface NodeInfoResult {
   indexResult: NodeInfoIndexResult
   dataResult?: NodeInfoDataResponse
 }
 
+export type NodeInfoIndexRequest = HttpRequestData;
+export type NodeInfoIndexResponse = HttpResponseData<NodeInfoIndex>;
+export type NodeInfoIndexExchange = HttpExchange<NodeInfoIndexRequest, NodeInfoIndexResponse>;
+
+export type NodeInfoDataRequest = HttpRequestData;
+export type NodeInfoDataResponse = HttpResponseData<NodeInfo>;
+export type NodeInfoDataExchange = HttpExchange<NodeInfoDataRequest, NodeInfoDataResponse>;
+
 // Cache for NodeInfo requests
-const cache = new Map<string, { data: NodeInfoDataResponse; timestamp: number }>()
+const cache = new Map<string, { data: NodeInfoDataExchange; timestamp: number }>()
 const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 /**
@@ -97,7 +100,7 @@ function extractHttpRequestResult(response: Response): HttpRequestResult {
  */
 function getCachedResult(
   key: string,
-): NodeInfoDataResponse | null {
+): NodeInfoDataExchange | null {
   const cached = cache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
     return cached.data;
@@ -108,18 +111,18 @@ function getCachedResult(
 /**
  * Set cache data
  */
-function setCacheResult(key: string, data: NodeInfoDataResponse): void {
+function setCacheResult(key: string, data: NodeInfoDataExchange): void {
   cache.set(key, { data, timestamp: Date.now() })
 }
 
 /**
  * Fetch NodeInfo index from /.well-known/nodeinfo
  */
-async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexResult> {
+async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexExchange> {
   try {
     const url = `${baseUrl}/.well-known/nodeinfo`
     console.debug('Fetching NodeInfo index from', url)
-    
+
     const response = await fetch(url, {
       headers: {
         'Accept': 'application/json'
@@ -130,10 +133,13 @@ async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexResult>
 
     if (!response.ok) {
       console.debug(`NodeInfo index fetch failed with HTTP ${response.status}`)
-      const result: NodeInfoIndexResult = {
-        status: 'error',
+      const result = {
+        success: false,
         error: `Failed to fetch NodeInfo index: HTTP ${response.status} ${response.statusText}`,
-        httpRequest
+        response: {
+          status_code: response.status,
+          headers: httpRequest.headers,
+        },
       }
       return result
     }
@@ -142,24 +148,30 @@ async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexResult>
     
     if (!data.links || !Array.isArray(data.links)) {
       console.debug('Invalid NodeInfo index format')
-      const result: NodeInfoIndexResult = {
-        status: 'error',
+      const result = {
+        success: false,
         error: 'Invalid NodeInfo index format: missing or invalid links array',
-        httpRequest
+        response: {
+          status_code: response.status,
+          headers: httpRequest.headers,
+        }
       }
       return result
     }
 
     return {
-      status: "success",
-      data: data,
-      httpRequest,
+      success: true,
+      response: {
+        status_code: response.status,
+        headers: httpRequest.headers,
+        payload: data,
+      }
     };
 
   } catch (error) {
     console.debug('NodeInfo index fetch error:', error)
     return {
-      status: 'error',
+      success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
@@ -197,7 +209,7 @@ function getLatestNodeInfoUrl(index: NodeInfoIndex): string | null {
 /**
  * Fetch NodeInfo from a specific URL
  */
-async function fetchNodeInfo(url: string): Promise<NodeInfoDataResponse> {
+async function fetchNodeInfo(url: string): Promise<NodeInfoDataExchange> {
   const cacheKey = `nodeinfo-data:${url}`
   const cached = getCachedResult(cacheKey)
   if (cached) {
@@ -218,10 +230,13 @@ async function fetchNodeInfo(url: string): Promise<NodeInfoDataResponse> {
 
     if (!response.ok) {
       console.debug(`NodeInfo fetch failed with HTTP ${response.status}`)
-      const result: NodeInfoDataResponse = {
-        status: 'error',
+      const result = {
+        success: false,
         error: `Failed to fetch NodeInfo: HTTP ${response.status} ${response.statusText}`,
-        httpRequest
+        response: {
+          status_code: response.status,
+          headers: httpRequest.headers,
+        }
       }
       return result
     }
@@ -232,16 +247,23 @@ async function fetchNodeInfo(url: string): Promise<NodeInfoDataResponse> {
     if (!data.software?.name || !data.software?.version) {
       console.debug('Invalid NodeInfo format: missing software info')
       return {
-        status: 'error',
+        success: false,
         error: 'Invalid NodeInfo format: missing software name or version',
-        httpRequest
+        response: {
+          status_code: response.status,
+          headers: httpRequest.headers,
+          payload: data
+        }
       }
     }
 
-    const result: NodeInfoDataResponse = {
-      status: 'success',
-      data,
-      httpRequest
+    const result = {
+      success: true,
+      response: {
+        status_code: response.status,
+        headers: httpRequest.headers,
+        payload: data
+      }
     }
 
 
@@ -251,7 +273,7 @@ async function fetchNodeInfo(url: string): Promise<NodeInfoDataResponse> {
   } catch (error) {
     console.debug('NodeInfo fetch error:', error)
     return {
-      status: 'error',
+      success: false,
       error: error instanceof Error ? error.message : 'Unknown error'
     }
   }
@@ -261,39 +283,40 @@ async function fetchNodeInfo(url: string): Promise<NodeInfoDataResponse> {
  * Load NodeInfo for a server
  * Returns both the index result and the data result
  */
-export async function getNodeInfo(baseUrl: string): Promise<NodeInfoResult> {
+export async function getNodeInfo(baseUrl: string)
+    : Promise<[NodeInfoIndexExchange | undefined, 
+                NodeInfoDataExchange | undefined]> {
   console.debug('Loading NodeInfo for', baseUrl)
 
   // Fetch the NodeInfo index
-  const indexResult = await fetchNodeInfoIndex(baseUrl)
+  const indexExchange = await fetchNodeInfoIndex(baseUrl)
 
   // If index fetch failed, return early with only the index result
-  if (indexResult.status === 'error' || !indexResult.data) {
-    return {
-      indexResult
-    }
+  if (!indexExchange.success || !indexExchange.response?.payload) {
+    return [indexExchange, undefined]
   }
 
+
   // Get the latest NodeInfo version URL
-  const nodeinfoUrl = getLatestNodeInfoUrl(indexResult.data)
+  const nodeinfoUrl = getLatestNodeInfoUrl(indexExchange.response.payload)
   
   if (!nodeinfoUrl) {
-    return {
-      indexResult,
-      dataResult: {
-        status: 'error',
+    return [
+      indexExchange,
+      {
+        success: false,
         error: 'No valid NodeInfo version found in index'
       }
-    }
+    ]
   }
 
   // Fetch the NodeInfo document
-  const dataResult = await fetchNodeInfo(nodeinfoUrl)
+  const dataExchange = await fetchNodeInfo(nodeinfoUrl)
 
-  return {
-    indexResult,
-    dataResult
-  }
+  return [
+    indexExchange,
+    dataExchange
+  ]
 }
 
 /**

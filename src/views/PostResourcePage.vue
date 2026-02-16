@@ -239,12 +239,12 @@ async function parseAudience(input: string): Promise<string[]> {
     if (isFediHandle(value)) {
       resolveStatus.value = `Resolving ${value}...`
       try {
-        const result = await resolveHandle(value)
-        if (result.success && result.actorUri) {
-          resolved.push(result.actorUri)
-          console.log(`Resolved ${value} to ${result.actorUri}`)
+        const actorUri = await resolveHandle(value)
+        if (actorUri) {
+          resolved.push(actorUri)
+          console.log(`Resolved ${value} to ${actorUri}`)
         } else {
-          console.warn(`Failed to resolve ${value}:`, result.error)
+          console.warn(`Failed to resolve ${value}`)
           // Keep the original value if resolution fails
           resolved.push(value)
         }
@@ -289,16 +289,16 @@ async function resolveMentions(text: string): Promise<Array<{ type: string; href
   for (const mention of mentions) {
     resolveStatus.value = `Resolving mention ${mention.name}...`
     try {
-      const result = await resolveHandle(mention.handle)
-      if (result.success && result.actorUri) {
+      const actorUri = await resolveHandle(mention.handle)
+      if (actorUri) {
         resolved.push({
           type: 'Mention',
-          href: result.actorUri,
+          href: actorUri,
           name: mention.name
         })
-        console.log(`Resolved mention ${mention.name} to ${result.actorUri}`)
+        console.log(`Resolved mention ${mention.name} to ${actorUri}`)
       } else {
-        console.warn(`Failed to resolve mention ${mention.name}:`, result.error)
+        console.warn(`Failed to resolve mention ${mention.name}`)
       }
     } catch (error) {
       console.error(`Error resolving mention ${mention.name}:`, error)

@@ -3,9 +3,10 @@
  * https://tools.ietf.org/html/rfc7591
  */
 
-import { ServerInfo } from "./authServerMetadataService"
+import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
+import { UrlComponents } from "./authServerDiscoveryService"
 
-export type RegistrationMethod = 'RFC7591' | 'Mastodon' | 'Manual'
+export type ClientRegistrationMethod = 'RFC7591' | 'Mastodon' | 'Manual' | "N/A"
 
 export interface ClientMetadata {
   client_name?: string
@@ -31,6 +32,7 @@ export interface ClientRegistrationData {
   grant_types?: string[]
   response_types?: string[]
   client_name?: string
+  name?: string // Mastodon uses "name" instead of "client_name"?
   client_uri?: string
   logo_uri?: string
   scope?: string
@@ -41,14 +43,7 @@ export interface ClientRegistrationData {
   registration_access_token?: string
 }
 
-export interface HttpMeta {
-  status: number
-  statusText: string
-  duration: number
-  headers?: Record<string, string>
-}
-
-export interface ClientRegistrationRequest
+export interface ClientRegistrationParams
 {
   client_name: string
   redirect_uris: string[] | string
@@ -56,16 +51,12 @@ export interface ClientRegistrationRequest
   scope: string | undefined
 };
 
+type ClientRegistrationRequest = HttpRequestData<ClientRegistrationParams>;
+type ClientRegistrationResponse = HttpResponseData<ClientRegistrationData>;
+type ClientRegistrationExchange = HttpExchange<ClientRegistrationRequest, ClientRegistrationResponse>
 export interface ClientRegistrationResult {
-  success: boolean
-  data?: ClientRegistrationData
-  error?: string
-  registrationMethod?: RegistrationMethod
-  requestData?: ClientMetadata
-  requestHeaders?: Record<string, string>
-  requestUrl?: string
-  httpMeta?: HttpMeta
-  responseRaw?: string
+  registrationMethod?: ClientRegistrationMethod
+  exchange: ClientRegistrationExchange
 }
 
 /**
@@ -73,43 +64,33 @@ export interface ClientRegistrationResult {
  * using RFC 7591 Dynamic Client Registration or Mastodon API
  */
 export async function registerClient(
-  serverInfo: ServerInfo,
-  registrationEndpoint: string,
-  metadata: ClientMetadata
+  serverInfo: UrlComponents,
+  registrationEndpoint: string | undefined,
+  params: ClientRegistrationParams
 ): Promise<ClientRegistrationResult> {
-  try {
-    let registrationMethod: RegistrationMethod = "RFC7591";
 
-    if (!isDefined(registrationEndpoint) || registrationEndpoint.includes('/api/v1/apps')) {
+  const requestHeaders: Record<string, string> = {
+    'Content-Type': 'application/json',
+    'Accept': 'application/json'
+  }
+
+  try {
+    let registrationMethod: ClientRegistrationMethod = "RFC7591";
+
+    if (!isDefined(registrationEndpoint) || registrationEndpoint?.includes('/api/v1/apps')) {
       // No endpoint in metadata, try Mastodon-style registration
       registrationEndpoint = `${serverInfo.baseUrl}/api/v1/apps`
       registrationMethod = "Mastodon";
     }
 
     console.debug(`Registering client at: ${registrationEndpoint}`)
-    console.debug('Client metadata:', metadata)
-  
-    const registrationRequest: ClientRegistrationRequest = {
-      client_name: 'activitypub-c2s-client',
-      redirect_uris: registrationMethod === "Mastodon" ? metadata.redirect_uris[0] : metadata.redirect_uris,
-      scopes: registrationMethod === "Mastodon" ? metadata.scope : undefined,
-      scope: registrationMethod === "Mastodon" ? undefined : metadata.scope,
-    };
+    console.debug('Registration request:', params)
 
-    console.debug('Registration request:', registrationRequest)
-
-    const startTime = Date.now()
-    const requestHeaders: Record<string, string> = {
-      'Content-Type': 'application/json',
-      'Accept': 'application/json'
-    }
-
-    const response = await fetch(registrationEndpoint, {
+    const response = await fetch(registrationEndpoint!, {
       method: 'POST',
       headers: requestHeaders,
-      body: JSON.stringify(registrationRequest)
+      body: JSON.stringify(params)
     })
-    const duration = Date.now() - startTime
 
     // Capture response headers (including CORS headers when exposed)
     const headersObj: Record<string, string> = {}
@@ -134,13 +115,6 @@ export async function registerClient(
       }
     })
 
-    const httpMeta: HttpMeta = {
-      status: response.status,
-      statusText: response.statusText,
-      duration,
-      headers: headersObj
-    }
-
     if (!response.ok) {
       const errorText = await response.text()
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`
@@ -159,14 +133,20 @@ export async function registerClient(
 
       console.error('Client registration failed:', errorMessage)
       return {
-        success: false,
-        error: errorMessage,
         registrationMethod,
-        requestData: metadata,
-        requestHeaders,
-        requestUrl: registrationEndpoint,
-        httpMeta,
-        responseRaw: errorText
+        exchange: {
+          success: false,
+          error: errorMessage,
+          request: {
+            url: registrationEndpoint!,
+            headers: requestHeaders,
+            params
+          },
+          response: {
+            status_code: response.status,
+            headers: headersObj,
+          }
+        }
       }
     }
 
@@ -182,51 +162,56 @@ export async function registerClient(
     console.debug('Client registration successful:', data)
 
     return {
-      success: true,
-      data,
       registrationMethod,
-      requestData: metadata,
-      requestHeaders,
-      requestUrl: registrationEndpoint,
-      httpMeta,
-      responseRaw: responseText
+      exchange: {
+        success: true,
+        request: {
+          url: registrationEndpoint!,
+          headers: requestHeaders,
+          params
+        },
+        response: {
+          status_code: response.status,
+          headers: headersObj,
+          payload: data
+        }
+      },
     }
   } catch (error) {
     console.error('Client registration error:', error)
     return {
-      success: false,
-      error: error instanceof Error ? error?.message : 'Network error during client registration',
-      requestHeaders: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json'
-      },
-      requestUrl: registrationEndpoint,
-      httpMeta: {
-        status: 0,
-        statusText: 'Network Error',
-        duration: 0
+      registrationMethod: 'RFC7591',
+      exchange: {
+        success: false,
+        error: error instanceof Error ? error?.message : 'Network error during client registration',
+        request: {
+          url: registrationEndpoint!,
+          headers: requestHeaders,
+          params: params
       }
     }
+  }
   }
 }
 
 /**
  * Create default client metadata for registration
  */
-export function createDefaultClientMetadata(
+export function defaultClientRegistrationParams(
   clientName: string,
-  redirectUri: string,
-  scopes?: string
-): ClientMetadata {
+  redirectUris: string[],
+  scopes: string = 'read write follow',// Mastodon
+): ClientRegistrationParams {
   return {
     client_name: clientName || 'ActivityPub C2S Client',
-    redirect_uris: [redirectUri],
-    grant_types: ['authorization_code', 'refresh_token'],
-    response_types: ['code'],
-    scope: scopes || 'read write follow',
-    client_uri: typeof window !== 'undefined' ? window.location.origin : undefined,
-    software_id: 'activitypub-c2s-client',
-    software_version: '1.0.0'
+    redirect_uris: redirectUris,
+    //grant_types: ['authorization_code', 'refresh_token'],
+    //response_types: ['code'],
+    scopes: scopes,
+    scope: scopes // Mastodon
+    // client_uri: typeof window !== 'undefined' ? window.location.origin : undefined,
+    // software_id: 'activitypub-c2s-client',
+    // software_version: '1.0.0'
   }
 }
 

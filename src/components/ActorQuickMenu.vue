@@ -2,8 +2,7 @@
 import { ref, computed, watch } from 'vue'
 import { useRouter } from 'vue-router'
 import { useServerStore } from '@/stores/serverStore'
-import type { Actor } from '@/stores/serverStore'
-import { getActorDisplayName } from '@/services/actorDiscoveryService'
+import { getActorDisplayName, Actor } from '@/services/actorDiscoveryService'
 
 interface Props {
   actor?: Actor
