@@ -276,7 +276,15 @@ async function handleRefreshToken() {
 
     if (result.success && result.response) {
       serverStore.updateServerProperty(server.value.id, 'tokenResponse', result.response)
-      
+      // Reset the timestamp so expiry countdown reflects the refreshed token
+      serverStore.updateServerProperty(server.value.id, 'tokenExchange', {
+        ...server.value.tokenExchange,
+        request: {
+          ...server.value.tokenExchange?.request,
+          timestamp: Date.now() / 1000,
+        },
+      })
+
       // Discover actor information after token refresh
       try {
         const actorResult = await getActor(
