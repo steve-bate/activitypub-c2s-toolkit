@@ -75,6 +75,8 @@ async function introspectToken(
 
     if (clientSecret) {
       requestHeaders['Authorization'] = `Basic ${btoa(`${clientId}:${clientSecret}`)}`
+    } else {
+      requestHeaders['Authorization'] = `Bearer ${accessToken}`
     }
       
     const response = await fetch(introspectionEndpoint, {
