@@ -5,6 +5,7 @@ import ServerDetailPage from '@/views/ServerDetailPage.vue'
 import AddServerPage from '@/views/AddServerPage.vue'
 import OAuthCallbackPage from '@/views/OAuthCallbackPage.vue'
 import PostResourcePage from '@/views/PostResourcePage.vue'
+import FollowPage from '@/views/FollowPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -43,6 +44,11 @@ const router = createRouter({
       path: '/post',
       name: 'post-resource',
       component: PostResourcePage
+    },
+    {
+      path: '/follow',
+      name: 'follow',
+      component: FollowPage
     }
   ]
 })

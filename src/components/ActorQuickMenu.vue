@@ -39,7 +39,12 @@ async function handleMenuClick(item: string) {
     void router.push({ path: '/post' })
     return
   }
-  
+
+  if (item === 'follow') {
+    void router.push({ path: '/follow' })
+    return
+  }
+
   if (item === 'update' || item === 'delete') {
     showNotImplemented.value = true
     return
@@ -202,6 +207,12 @@ function closeAllMenus() {
             class="w-full px-6 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
           >
             Create
+          </button>
+          <button
+            @click="handleMenuClick('follow')"
+            class="w-full px-6 py-2 text-left text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-800"
+          >
+            Follow
           </button>
           <button
             @click="handleMenuClick('update')"
