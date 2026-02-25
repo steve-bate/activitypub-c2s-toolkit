@@ -11,7 +11,7 @@
 
 import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
 
-export interface WebFingerLink {
+/*export*/ interface WebFingerLink {
   rel: string
   type?: string
   href?: string
@@ -20,7 +20,7 @@ export interface WebFingerLink {
   titles?: Record<string, string>
 }
 
-export interface WebFingerData {
+/*export*/ interface WebFingerData {
   subject: string
   aliases?: string[]
   properties?: Record<string, string | null>
@@ -33,7 +33,7 @@ interface WebFingerParams {
 
 type WebFingerRequest = HttpRequestData<WebFingerParams>;
 type WebFingerResponse = HttpResponseData<WebFingerData>;
-export type WebFingerExchange = HttpExchange<WebFingerRequest, WebFingerResponse>;
+/*export*/ type WebFingerExchange = HttpExchange<WebFingerRequest, WebFingerResponse>;
 
 // Cache for WebFinger requests
 const cache = new Map<string, { data: WebFingerExchange; timestamp: number }>()
@@ -136,6 +136,7 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
         },
         response: {
           status_code: response.status,
+          status_text: response.statusText,
           headers: Object.fromEntries(response.headers.entries()),
         }
       }
@@ -156,6 +157,7 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
         },
         response: {
           status_code: response.status,
+          status_text: response.statusText,
           headers: Object.fromEntries(response.headers.entries()),
           payload: data
         }
@@ -176,6 +178,7 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
         },
         response: {
           status_code: response.status,
+          status_text: response.statusText,
           headers: Object.fromEntries(response.headers.entries()),
           payload: data
         }
@@ -191,6 +194,7 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
       },
       response: {
         status_code: response.status,
+        status_text: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
         payload: data
       }
@@ -259,21 +263,5 @@ export async function resolveHandle(handle: string): Promise<string | undefined>
   const exchange = await fetchWebFinger(domain, resource)
   if (exchange.success && exchange.response?.payload) {
     return extractActorUri(exchange.response.payload)
-  }
-}
-
-/**
- * Clear cache for a specific handle or all handles
- */
-export function clearWebFingerCache(handle?: string): void {
-  if (handle) {
-    const parsed = parseHandle(handle)
-    if (parsed) {
-      const resource = buildResourceUri(parsed.username, parsed.domain)
-      cache.delete(`webfinger:${resource}`)
-    }
-  } else {
-    // Clear all cache
-    cache.clear()
   }
 }

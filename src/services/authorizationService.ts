@@ -6,23 +6,28 @@
 
 import { HttpExchange, HttpRequestData, HttpResponseData } from '@/types/http'
 import type { AuthServerMetadata } from './authServerDiscoveryService'
-import { type OAuth2Config } from '@/stores/serverStore'
 
-export interface AuthorizationOptions {
-  serverId: string
+export interface ClientConfig {
+  clientId: string
+  clientSecret: string
+  redirectUri: string
+  scopes: string
+}
+/*export*/  interface AuthConfig {
+  serverOrigin: string
   serverMetadata: AuthServerMetadata
-  oauth2Config: OAuth2Config
   state?: string
+  clientConfig: ClientConfig
 }
 
-export interface TokenExchangeOptions {
-  serverId: string
+/*export*/ interface TokenExchangeConfig {
+  serverOrigin: string
   authCode: string
-  serverMetadata: AuthServerMetadata
-  oauth2Config: OAuth2Config
+  authServerMetadata: AuthServerMetadata
+  clientConfig?: ClientConfig
 }
 
-export interface TokenExchangeParams {
+/*export*/ interface TokenExchangeParams {
   grant_type: string;
   redirect_uri: string;
   client_id: string;
@@ -43,15 +48,31 @@ export type TokenExchangeRequest = HttpRequestData<TokenExchangeParams>
 export type TokenExchangeResponse = HttpResponseData<TokenResponsePayload>
 export type TokenExchangeHttpExchange = HttpExchange<TokenExchangeRequest, TokenExchangeResponse>
 
-export interface TokenRefreshParams {
+/*export*/ interface TokenRefreshParams {
   grant_type: string;
   refresh_token: string;
   client_id: string;
 }
 
-
-// TODO make this generic
 export type TokenRefreshRequest = HttpRequestData<TokenRefreshParams>
+export type TokenRefreshResponse = HttpResponseData<TokenResponsePayload>
+export type TokenRefreshHttpExchange = HttpExchange<TokenRefreshRequest, TokenRefreshResponse>
+
+/*export*/ interface TokenRevocationParams {
+  token: string;
+  token_type_hint: string;
+  client_id: string;
+}
+
+interface TokenRevocationResponsePayload {
+  revoked: true;
+  revoked_at: string;
+  access_token?: string; // Should be undefined
+}
+
+export type TokenRevocationRequest = HttpRequestData<TokenRevocationParams>
+export type TokenRevocationResponse = HttpResponseData<TokenRevocationResponsePayload>
+export type TokenRevocationHttpExchange = HttpExchange<TokenRevocationRequest, TokenRevocationResponse>
 
 /**
  * Generate a cryptographically secure random string for PKCE code verifier
@@ -128,8 +149,8 @@ function clearPKCEParameters(serverId: string): void {
  * Check if the server supports PKCE based on metadata
  */
 function supportsPKCE(metadata: AuthServerMetadata): boolean {
-  return metadata.code_challenge_methods_supported.includes('S256') ||
-         metadata.code_challenge_methods_supported.includes('plain')
+  return metadata.code_challenge_methods_supported?.includes('S256') ||
+         metadata.code_challenge_methods_supported?.includes('plain')
 }
 
 /**
@@ -138,20 +159,25 @@ function supportsPKCE(metadata: AuthServerMetadata): boolean {
  * 
  * @param options Authorization options including server metadata and OAuth2 config
  */
-export async function initiateAuthorizationFlow(options: AuthorizationOptions): Promise<void> {
-  const { serverId, serverMetadata, oauth2Config, state: providedState } = options
+export async function initiateAuthorizationFlow(options: AuthConfig): Promise<void> {
+  const {
+    serverOrigin: serverId,
+    serverMetadata: authServerMetadata,
+    clientConfig,
+    state: providedState,
+  } = options;
   
   console.debug(`Initiating OAuth authorization flow for server ${serverId}`)
   
-  if (!serverMetadata.authorization_endpoint) {
+  if (!authServerMetadata.authorization_endpoint) {
     throw new Error('Authorization endpoint not found in server metadata')
   }
   
-  if (!oauth2Config.clientId) {
+  if (!clientConfig.clientId) {
     throw new Error('Client ID not configured')
   }
   
-  if (!oauth2Config.redirectUri) {
+  if (!clientConfig.redirectUri) {
     throw new Error('Redirect URI not configured')
   }
   
@@ -159,18 +185,24 @@ export async function initiateAuthorizationFlow(options: AuthorizationOptions): 
   const state = providedState || generateState()
   
   // Build authorization URL
-  const authUrl = new URL(serverMetadata.authorization_endpoint)
-  authUrl.searchParams.append('client_id', oauth2Config.clientId)
-  authUrl.searchParams.append('redirect_uri', oauth2Config.redirectUri)
+  const authUrl = new URL(authServerMetadata.authorization_endpoint)
+  authUrl.searchParams.append('client_id', clientConfig.clientId)
+  authUrl.searchParams.append('redirect_uri', clientConfig.redirectUri)
   authUrl.searchParams.append('response_type', 'code')
   authUrl.searchParams.append('state', state)
   
-  if (oauth2Config.scopes) {
-    authUrl.searchParams.append('scope', oauth2Config.scopes)
+  if (clientConfig.scopes) {
+    authUrl.searchParams.append('scope', clientConfig.scopes)
+    // Check for Mastodon case
+    if (authServerMetadata['app_registration_endpoint']) {
+      console.log("Using Mastodon scopes parameter instead of scope")
+      authUrl.searchParams.delete('scope')
+      authUrl.searchParams.set('scopes', clientConfig.scopes)
+    }
   }
   
   // Add PKCE parameters if supported
-  if (supportsPKCE(serverMetadata)) {
+  if (supportsPKCE(authServerMetadata)) {
     const codeVerifier = generateCodeVerifier()
     const codeChallenge = await generateCodeChallenge(codeVerifier)
     
@@ -246,20 +278,20 @@ export function validateState(serverId: string, receivedState: string): boolean 
  * @returns Token exchange result with token response or error
  */
 export async function exchangeCodeForToken(
-  options: TokenExchangeOptions
+  options: TokenExchangeConfig
 ): Promise<TokenExchangeHttpExchange> {
-  const { serverId, authCode, serverMetadata, oauth2Config } = options
+  const { serverOrigin: serverId, authCode, authServerMetadata, clientConfig } = options
   
   console.debug(`Exchanging authorization code for access token (server ${serverId})`)
   
-  if (!serverMetadata.token_endpoint) {
+  if (!authServerMetadata.token_endpoint) {
     return {
       success: false,
       error: 'Token endpoint not found in server metadata'
     }
   }
 
-  if (!oauth2Config.clientId) {
+  if (!clientConfig?.clientId) {
     return {
       success: false,
       error: 'Client ID not configured'
@@ -273,8 +305,8 @@ export async function exchangeCodeForToken(
   const tokenRequestParams: TokenExchangeParams = {
     grant_type: 'authorization_code',
     code: authCode,
-    redirect_uri: oauth2Config.redirectUri,
-    client_id: oauth2Config.clientId,
+    redirect_uri: clientConfig.redirectUri,
+    client_id: clientConfig.clientId,
     code_verifier: undefined
   }
   
@@ -298,8 +330,8 @@ export async function exchangeCodeForToken(
   
   // Add client authentication
   // Use Basic Authentication if client_secret is available
-  if (oauth2Config.clientSecret) {
-    const credentials = btoa(`${oauth2Config.clientId}:${oauth2Config.clientSecret}`)
+  if (clientConfig.clientSecret) {
+    const credentials = btoa(`${clientConfig.clientId}:${clientConfig.clientSecret}`)
     headers['Authorization'] = `Basic ${credentials}`
     console.debug('Using client_secret_basic authentication')
   } else {
@@ -310,7 +342,7 @@ export async function exchangeCodeForToken(
   const timestamp = new Date().toISOString()
 
   try {
-    const response = await fetch(serverMetadata.token_endpoint, {
+    const response = await fetch(authServerMetadata.token_endpoint, {
       method: 'POST',
       headers,
       body: tokenParams.toString()
@@ -349,12 +381,13 @@ export async function exchangeCodeForToken(
       success: true,
       response: {
         status_code: response.status,
+        status_text: response.statusText,
         headers: Object.fromEntries(response.headers.entries()),
         payload: tokenResponse,
       },
       request: {
         params: tokenRequestParams,
-        url: serverMetadata.token_endpoint,
+        url: authServerMetadata.token_endpoint,
         headers,
         timestamp
       }
@@ -381,8 +414,8 @@ export async function refreshAccessToken(
   serverId: string,
   refreshToken: string,
   serverMetadata: AuthServerMetadata,
-  oauth2Config: OAuth2Config
-): Promise<HttpExchange<TokenRefreshRequest, TokenResponsePayload>> {
+  clientConfig: ClientConfig
+): Promise<TokenRefreshHttpExchange> {
   console.debug(`Refreshing access token for server ${serverId}`)
   
   if (!serverMetadata.token_endpoint) {
@@ -392,7 +425,7 @@ export async function refreshAccessToken(
     }
   }
   
-  if (!oauth2Config.clientId) {
+  if (!clientConfig.clientId) {
     return {
       success: false,
       error: 'Client ID not configured'
@@ -403,7 +436,7 @@ export async function refreshAccessToken(
   const tokenRefreshParams: TokenRefreshParams = {
     grant_type: 'refresh_token',
     refresh_token: refreshToken,
-    client_id: oauth2Config.clientId
+    client_id: clientConfig.clientId
   }
   
   // Convert to URLSearchParams for form encoding
@@ -419,10 +452,12 @@ export async function refreshAccessToken(
   }
   
   // Add client authentication
-  if (oauth2Config.clientSecret) {
-    const credentials = btoa(`${oauth2Config.clientId}:${oauth2Config.clientSecret}`)
+  if (clientConfig.clientSecret) {
+    const credentials = btoa(`${clientConfig.clientId}:${clientConfig.clientSecret}`)
     headers['Authorization'] = `Basic ${credentials}`
   }
+  
+  const timestamp = new Date().toISOString()
   
   try {
     const response = await fetch(serverMetadata.token_endpoint, {
@@ -459,11 +494,17 @@ export async function refreshAccessToken(
     
     return {
       success: true,
-      response: tokenResponse,
+      response: {
+        status_code: response.status,
+        status_text: response.statusText,
+        headers: Object.fromEntries(response.headers.entries()),
+        payload: tokenResponse,
+      },
       request: {
         url: serverMetadata.token_endpoint,
         headers,
-        params: tokenRefreshParams
+        params: tokenRefreshParams,
+        timestamp
       }
     }
   } catch (error) {
@@ -491,8 +532,8 @@ export async function revokeToken(
   token: string,
   tokenTypeHint: 'access_token' | 'refresh_token',
   serverMetadata: AuthServerMetadata,
-  oauth2Config: OAuth2Config
-): Promise<{ success: boolean; error?: string }> {
+  clientConfig: ClientConfig
+): Promise<TokenRevocationHttpExchange> {
   console.debug(`Revoking ${tokenTypeHint} for server ${serverId}`)
   
   if (!serverMetadata.revocation_endpoint) {
@@ -504,10 +545,16 @@ export async function revokeToken(
   }
   
   // Build revocation request parameters
-  const revokeParams = new URLSearchParams({
+  const revocationParams: TokenRevocationParams = {
     token,
     token_type_hint: tokenTypeHint,
-    client_id: oauth2Config.clientId
+    client_id: clientConfig.clientId
+  }
+  
+  const revokeParams = new URLSearchParams({
+    token: revocationParams.token,
+    token_type_hint: revocationParams.token_type_hint,
+    client_id: revocationParams.client_id
   })
   
   // Prepare request headers
@@ -517,8 +564,8 @@ export async function revokeToken(
   }
   
   // Add client authentication
-  if (oauth2Config.clientSecret) {
-    const credentials = btoa(`${oauth2Config.clientId}:${oauth2Config.clientSecret}`)
+  if (clientConfig.clientSecret) {
+    const credentials = btoa(`${clientConfig.clientId}:${clientConfig.clientSecret}`)
     headers['Authorization'] = `Basic ${credentials}`
   }
   
@@ -533,7 +580,24 @@ export async function revokeToken(
     // has been revoked successfully or if the client submitted an invalid token
     if (response.ok) {
       console.debug('Token revocation successful')
-      return { success: true }
+      return {
+        success: true,
+        request: {
+          url: serverMetadata.revocation_endpoint,
+          headers,
+          params: revocationParams,
+          timestamp: new Date().toISOString()
+        },
+        response: {
+          status_code: response.status,
+          status_text: response.statusText,
+          headers: Object.fromEntries(response.headers.entries()),
+          payload: {
+            revoked: true,
+            revoked_at: new Date().toISOString()
+          }
+        }
+      }
     }
     
     const errorText = await response.text().catch(() => 'Unknown error')

@@ -1,83 +1,294 @@
 <script setup lang="ts">
+import { ref, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { useServerStore } from '@/stores/serverStore'
-import { useThemeStore } from '@/stores/themeStore'
-import ServerSelector from './ServerSelector.vue'
-import ActorQuickMenu from './ActorQuickMenu.vue'
+import { getActorDisplayName } from '@/services/actorDiscoveryService'
+import DisclosureIcon from '@/components/icons/DisclosureIcon.vue'
+import ActivityPubIcon from '@/components/icons/ActivityPubIcon.vue'
+import ServerIcon from '@/components/icons/ServerIcon.vue'
+import DocumentIcon from '@/components/icons/DocumentIcon.vue'
+import CheckmarkIcon from '@/components/icons/CheckmarkIcon.vue'
+import AddIcon from '@/components/icons/AddIcon.vue'
+import TrashIcon from '@/components/icons/TrashIcon.vue'
+import PersonIcon from '@/components/icons/PersonIcon.vue'
+import LetterIcon from '@/components/icons/LetterIcon.vue'
+import ExitIcon from '@/components/icons/ExitIcon.vue'
+import KeyIcon from '@/components/icons/KeyIcon.vue'
+import ProtectIcon from '@/components/icons/ProtectIcon.vue'
 
 const router = useRouter()
 const serverStore = useServerStore()
-const themeStore = useThemeStore()
+
+const serverMenuOpen = ref(false)
+const actorMenuOpen = ref(false)
+
+const hasServers = computed(() => serverStore.servers.length > 0)
+const hasMultipleServers = computed(() => serverStore.servers.length > 1)
+
+const hasActor = computed(() => {
+  return serverStore.activeServer?.actor?.profile != null
+})
+
+const actorDisplayName = computed(() => {
+  const actor = serverStore.activeServer?.actor?.profile
+  return actor ? getActorDisplayName(actor) : 'No Actor'
+})
+
+const authLabel = computed(() =>
+  serverStore.activeServer?.auth?.authType === 'oauth2' ? 'OAuth2' : 'Bearer Token'
+)
+
+function toggleServerMenu() {
+  if (!hasServers.value) return
+  serverMenuOpen.value = !serverMenuOpen.value
+  if (!serverMenuOpen.value) actorMenuOpen.value = false
+}
+
+function toggleActorMenu() {
+  if (!hasActor.value) return
+  actorMenuOpen.value = !actorMenuOpen.value
+  if (!actorMenuOpen.value) serverMenuOpen.value = false
+}
+
+function closeMenu() {
+  serverMenuOpen.value = false
+  actorMenuOpen.value = false
+}
+
+function selectServer(id: string) {
+  serverStore.setActiveServer(id)
+  closeMenu()
+}
+
+function navigate(path: string) {
+  void router.push(path)
+  closeMenu()
+}
+
+function navigateToActorResource(uriKey: 'id' | 'inbox' | 'outbox') {
+  const actor = serverStore.activeServer?.actor?.profile
+  if (!actor) return
+  const uri = actor[uriKey as keyof typeof actor] as string | undefined
+  if (!uri) return
+  void router.push({ path: '/json', query: { uri, property: uriKey } })
+  closeMenu()
+}
+
+function handleDeleteServer() {
+  const activeServer = serverStore.activeServer
+  if (!activeServer) return
+  if (confirm(`Are you sure you want to delete "${activeServer.name}"?`)) {
+    serverStore.deleteServer(activeServer.id)
+    closeMenu()
+    void router.push('/servers')
+  }
+}
 </script>
 
 <template>
   <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700 sticky top-0 z-50">
     <div class="px-4 py-3 flex items-center justify-between gap-4">
-      <!-- Left: App title as home link -->
-      <RouterLink to="/" class="flex items-center gap-2 hover:opacity-80 transition-opacity">
-        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 130 130" width="32" height="32">
-          <!-- Gray shape (left arrow) -->
-          <path d="M 54.456209,22.295602 L 1.4244898,53.713252 L 1.4244898,66.279912 L 43.677319,41.146452 L 43.677319,91.415162 L 54.556210,97.701002 L 54.456209,22.295602 Z M 32.686773,59.996502 L 10.912337,72.562902 L 32.686773,85.126392 L 32.686773,59.996502 Z" fill="#6d6d6d" />
-          
-          <!-- Magenta shape (right arrow) -->
-          <path d="M 65.335109,47.429102 L 86.108894,59.996502 L 65.335109,72.562902 L 65.335109,47.429102 Z M 65.335109,22.295602 L 119.754669,53.713252 L 119.754669,66.279912 L 65.335115,97.69902 L 65.335115,85.13146 L 108.87072,59.98023 L 65.335096,34.82901 L 65.335109,22.295602 Z" fill="#f10180" />
-        </svg>
+
+      <!-- ── Left: Logo + App Name ── -->
+      <RouterLink to="/" class="flex items-center gap-2 hover:opacity-80 transition-opacity shrink-0">
+        <ActivityPubIcon />
         <span class="text-xl font-semibold text-gray-900 dark:text-gray-100">
-        <span class="hidden sm:inline">ActivityPub </span>C2S Toolkit
+          <span class="hidden sm:inline">ActivityPub </span>C2S Toolkit
         </span>
       </RouterLink>
 
-      <!-- Right: Actor menu, server selector, settings, and theme toggle -->
-      <div class="flex items-center gap-4">
-        <ActorQuickMenu 
-          v-if="serverStore.activeServer?.authStatus === 'authorized' && serverStore.activeServer?.actor" 
-          :actor="serverStore.activeServer?.actor"
-        />
-        
-        <!-- Server selector and settings buttons (closer together) -->
-        <div class="flex items-center gap-1">
-          <ServerSelector />
+      <!-- ── Right: Controls ── -->
+      <div class="flex items-center gap-1">
 
-          <!-- Settings button (Server details) -->
+        <!-- Server Menu -->
+        <div class="relative">
+          <!-- Trigger button -->
           <button
-            v-if="serverStore.activeServer"
-            @click="router.push(`/servers/${serverStore.activeServer.id}`)"
-            class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            title="Server settings"
+            @click="toggleServerMenu"
+            :disabled="!hasServers"
+            :title="hasServers ? serverStore.activeServer?.name : 'No server configured'"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors"
+            :class="hasServers
+              ? 'text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+              : 'text-gray-400 dark:text-gray-600 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
+            <!-- Server icon -->
+            <ServerIcon class="w-4 h-4 shrink-0" />
+            <span class="max-w-[10rem] truncate">
+              {{ hasServers ? (serverStore.activeServer?.name ?? 'Select server') : 'No server' }}
+            </span>
+            <!-- Chevron -->
+            <DisclosureIcon
+              class="w-3.5 h-3.5 shrink-0 transition-transform"
+              :class="serverMenuOpen ? '-rotate-90' : 'rotate-90'"
+            />
           </button>
-          <button
-            v-else
-            disabled
-            class="p-2 text-gray-400 dark:text-gray-600 rounded-md cursor-not-allowed opacity-50"
-            title="No server selected"
+
+          <!-- Dropdown panel -->
+          <div
+            v-if="serverMenuOpen && hasServers"
+            class="absolute right-0 mt-2 w-60 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50"
           >
-            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
-            </svg>
-          </button>
+            <!-- Overview -->
+            <button
+              @click="navigate(`/servers/${serverStore.activeServer!.id}`)"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+            >
+              <DocumentIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              Overview
+            </button>
+
+            <!-- Authorization (label and icon adapt to auth type) -->
+            <button
+              @click="navigate(`/servers/${serverStore.activeServer!.id}/auth`)"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+            >
+              <ProtectIcon v-if="serverStore.activeServer?.auth?.authType === 'oauth2'" class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              <KeyIcon v-else class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              {{ authLabel }}
+            </button>
+
+            <!-- Separator -->
+            <div class="my-1 border-t border-gray-200 dark:border-gray-700" />
+
+            <!-- Switch Server (only when multiple servers exist) -->
+            <template v-if="hasMultipleServers">
+              <p class="px-3 pt-1.5 pb-0.5 text-[0.65rem] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500">
+                Switch Server
+              </p>
+              <button
+                v-for="server in serverStore.servers"
+                :key="server.id"
+                @click="selectServer(server.id)"
+                class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors"
+                :class="server.id === serverStore.activeServerId
+                  ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
+              >
+                <ServerIcon class="w-3.5 h-3.5 shrink-0 opacity-60" />
+                <span class="truncate flex-1">{{ server.name }}</span>
+                <CheckmarkIcon v-if="server.id === serverStore.activeServerId" class="w-3.5 h-3.5 shrink-0 text-blue-500" />
+              </button>
+            </template>
+
+            <!-- Separator -->
+            <div class="my-1 border-t border-gray-200 dark:border-gray-700" />
+
+            <!-- Add Server Config -->
+            <button
+              @click="navigate('/servers/new')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+            >
+              <AddIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              Add Server Config
+            </button>
+
+            <!-- Delete Server Config -->
+            <button
+              @click="handleDeleteServer"
+              class="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
+            >
+              <TrashIcon class="w-4 h-4 shrink-0" />
+              Delete Server Config
+            </button>
+          </div>
+
+          <!-- Clickaway backdrop -->
+          <div v-if="serverMenuOpen" @click="closeMenu" class="fixed inset-0 z-40" />
         </div>
 
-        <!-- Theme toggle button -->
-        <button
-          @click="themeStore.toggleTheme"
+        <!-- Actor Menu -->
+        <div class="relative">
+          <!-- Trigger button -->
+          <button
+            @click="toggleActorMenu"
+            :disabled="!hasActor"
+            :title="hasActor ? actorDisplayName : 'No actor discovered'"
+            class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors"
+            :class="hasActor
+              ? 'text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
+              : 'text-gray-400 dark:text-gray-600 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'"
+          >
+            <!-- Actor icon -->
+            <PersonIcon class="w-4 h-4 shrink-0" />
+            <span class="max-w-[10rem] truncate">
+              {{ actorDisplayName }}
+            </span>
+            <!-- Chevron -->
+            <DisclosureIcon
+              class="w-3.5 h-3.5 shrink-0 transition-transform"
+              :class="actorMenuOpen ? '-rotate-90' : 'rotate-90'"
+            />
+          </button>
+
+          <!-- Dropdown panel -->
+          <div
+            v-if="actorMenuOpen && hasActor"
+            class="absolute right-0 mt-2 w-60 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50"
+          >
+            <!-- Actor Profile -->
+            <button
+              @click="navigateToActorResource('id')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+            >
+              <PersonIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              Actor
+            </button>
+
+            <!-- Inbox -->
+            <button
+              @click="navigateToActorResource('inbox')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+            >
+              <LetterIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              Inbox
+            </button>
+
+            <!-- Outbox -->
+            <button
+              @click="navigateToActorResource('outbox')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+            >
+              <ExitIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              Outbox
+            </button>
+
+            <div class="my-1 border-t border-gray-200 dark:border-gray-700" />
+
+            <button
+              @click="navigate('/post')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+            >
+              <AddIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />              Create Resource
+            </button>
+
+            <button
+              @click="navigate('/follow')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
+            >
+              <PersonIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              Follow
+            </button>
+          </div>
+
+          <!-- Clickaway backdrop -->
+          <div v-if="actorMenuOpen" @click="closeMenu" class="fixed inset-0 z-40" />
+        </div>
+
+        <!-- Settings button -->
+        <RouterLink
+          to="/settings"
+          title="Settings"
           class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-          :title="themeStore.isDark ? 'Switch to light mode' : 'Switch to dark mode'"
         >
-          <!-- Sun icon (show when dark) -->
-          <svg v-if="themeStore.isDark" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+          <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
           </svg>
-          <!-- Moon icon (show when light) -->
-          <svg v-else class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
-          </svg>
-        </button>
+        </RouterLink>
+
+
       </div>
     </div>
   </header>

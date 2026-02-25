@@ -1,32 +1,53 @@
 <script setup lang="ts">
-import { ref } from 'vue'
+import { ref, computed, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { useServerStore } from '@/stores/serverStore'
-import OAuth2InitiateFlow from '@/components/server/OAuth2InitiateFlow.vue'
-import BearerTokenForm from '@/components/server/BearerTokenForm.vue'
-import { parseUrl, discoverServerMetadata, AuthServerDiscoveryResult, UrlComponents } from '@/services/authServerDiscoveryService'
-import { registerClient, defaultClientRegistrationParams } from '@/services/clientRegistrationService'
+import { useSettingsStore } from '@/stores/settingsStore'
+import BearerTokenForm from '@/components/BearerTokenForm.vue'
+import { resolveHandle as resolveWebFingerResource } from '@/services/webfingerService'
 
 const router = useRouter()
 const serverStore = useServerStore()
+const settingsStore = useSettingsStore()
 
-// Get redirect URI safely
-const redirectUri = ref(`${typeof window !== 'undefined' ? window.location.origin : 'http://localhost:5173'}/callback`)
+const OAUTH2_IDENTIFIER_KEY = 'c2s_oauth2_identifier'
+
+/** Whether the user has a choice of auth method (both enabled). */
+const hasAuthChoice = computed(() =>
+  settingsStore.settings.authMethods.oauth2 && settingsStore.settings.authMethods.bearer
+)
+
+/**
+ * Determine the initial step based on which auth methods are enabled.
+ * If only one method is enabled, skip straight to that method's step.
+ */
+function initialStep(): string {
+  if (!settingsStore.settings.authMethods.oauth2 && settingsStore.settings.authMethods.bearer) {
+    return 'edit-bearer'
+  }
+  if (settingsStore.settings.authMethods.oauth2 && !settingsStore.settings.authMethods.bearer) {
+    return 'identifier'
+  }
+  return 'auth-type'
+}
 
 // Form states
-const step = ref('auth-type') // auth-type | identifier | discovering | registering | edit | edit-bearer | success
-const authType = ref<'oauth2' | 'bearer'>('oauth2')
+const step = ref(initialStep())
 const identifier = ref('')
-const discoveryError = ref(null)
-const isDiscovering = ref(false)
-const isRegistering = ref(false)
-const registrationError = ref<string | null>(null)
+const identifierError = ref<string | null>(null)
+
+// Restore saved identifier on mount so it is pre-filled when the identifier step is shown
+onMounted(() => {
+  const saved = localStorage.getItem(OAUTH2_IDENTIFIER_KEY)
+  if (saved) {
+    identifier.value = saved
+  }
+})
 
 /**
  * Handle auth type selection
  */
 function handleAuthTypeSelect(type: 'oauth2' | 'bearer') {
-  authType.value = type
   if (type === 'oauth2') {
     step.value = 'identifier'
   } else {
@@ -35,187 +56,92 @@ function handleAuthTypeSelect(type: 'oauth2' | 'bearer') {
 }
 
 /**
- * Handle identifier input and start discovery
+ * Resolve a raw identifier string to an origin URL.
+ * Supports fedi handles (@user@domain), full URLs, and bare domains.
  */
-async function handleIdentifierSubmit() {
-  if (!identifier.value.trim()) return
-
-  step.value = 'discovering'
-  isDiscovering.value = true
-  discoveryError.value = null
+async function resolveIdentifierToOrigin(raw: string): Promise<URL> {
+  if (raw.startsWith('@')) {
+    const actorUri = await resolveWebFingerResource(raw)
+    if (!actorUri) throw new Error('Failed to resolve handle to ActivityPub actor')
+    const u = new URL(actorUri)
+    return new URL(`${u.protocol}//${u.host}`)
+  }
 
   try {
-    // Attempt RFC 8414 discovery
-    const serverUrl = parseUrl(identifier.value)
-    const result = await discoverServerMetadata(serverUrl)
-
-    if (result.exchange.success) {
-      // Success - use discovered metadata
-      console.log('Auth Server discovery successful', result)
-      await createServerWithAuthDiscoveryResult(serverUrl, result)
-    } else {
-      // Discovery failed - show form for manual configuration
-      // FIXME
-      // discoveryError.value = result.error
-      step.value = 'edit'
+    const u = new URL(raw)
+    if (u.protocol !== 'http:' && u.protocol !== 'https:') {
+      throw new Error('Only http/https URLs are supported')
     }
-  } catch (error) {
-    console.error('Discovery error:', error)
-    //FIXME
-    //discoveryError.value = error.message
-    step.value = 'edit'
-  } finally {
-    isDiscovering.value = false
+    return new URL(u.origin)
+  } catch {
+    // Bare domain – assume HTTPS
+    return new URL(`https://${raw}`)
   }
 }
 
 /**
- * Create server with discovered metadata and auto-register if possible
+ * Handle identifier input: create server entry, mark it for the automatic
+ * OAuth2 flow that runs on the server detail page, then navigate there.
  */
-async function createServerWithAuthDiscoveryResult(
-  serverUrl: UrlComponents,
-  authDiscoveryResult: AuthServerDiscoveryResult
-) {
-  // Create the server first
-  const server = serverStore.addServer({
-    identifier: identifier.value,
-    name: serverUrl.hostname,
-    baseUrl: serverUrl.baseUrl,
-    authType: 'oauth2',
-    oauth2: {
-      clientId: '',
-      clientSecret: '',
-      redirectUri: redirectUri.value,
-    }
-  })
+async function handleAuthServerOriginSubmit() {
+  if (!identifier.value.trim()) return
 
-  serverStore.saveAuthServerDiscoveryResult(server.id, authDiscoveryResult)
+  identifierError.value = null
+  localStorage.setItem(OAUTH2_IDENTIFIER_KEY, identifier.value)
 
-  // Attempt automatic client registration if supported
-  step.value = 'registering'
-  isRegistering.value = true
-  registrationError.value = null
-
+  let authServerUrl: URL
   try {
-    const clientMetadata = defaultClientRegistrationParams(
-      serverUrl.hostname,
-      [redirectUri.value],
-    )
-
-    if (authDiscoveryResult.discoveryMethod === 'Mastodon') {
-      clientMetadata.redirect_uris = clientMetadata.redirect_uris[0] // Mastodon expects single string
-    }
-    
-    const registrationEndpoint = authDiscoveryResult.exchange.response?.payload?.registration_endpoint;
-    
-    const registrationResult = await registerClient(
-      serverUrl,
-      registrationEndpoint,
-      clientMetadata
-    )
-
-    serverStore.updateServerProperty(server.id, 'auth.oauth2.clientRegistration', registrationResult)
-
-    // TODO temporary hack to support refactoring
-
-    server.oauth2 = {
-      ...server.oauth2,
-      clientId: registrationResult.exchange.response?.payload?.client_id || '',
-      clientSecret: registrationResult.exchange.response?.payload?.client_secret || '',
-      redirectUri: redirectUri.value,
-      scopes: 'read write follow'
-    }
-    serverStore.updateServerProperty(server.id, 'oauth2', server.oauth2)
-
+    authServerUrl = await resolveIdentifierToOrigin(identifier.value)
   } catch (error) {
-    console.error('Client registration error:', error)
-    registrationError.value = error instanceof Error ? error.message : String(error)
-  } finally {
-    isRegistering.value = false
+    identifierError.value = error instanceof Error ? error.message : String(error)
+    return
   }
 
-  // Navigate to server detail page to show exchange details (success or failure)
-  step.value = 'success'
+  const server = serverStore.addServer({
+    userInput: identifier.value,
+    authServerOrigin: authServerUrl.origin,
+    authType: 'oauth2',
+  })
+
   serverStore.markServerForAutoAuth(server.id)
   serverStore.setActiveServer(server.id)
-  
+
+  step.value = 'success'
+
+  // The delay is not completely necessary
   setTimeout(() => {
-    void router.push(`/servers/${server.id}`)
-  }, 1000)
+    void router.push(`/servers/${server.id}/auth`)
+  }, 800)
 }
 
 /**
  * Handle bearer token form submission
  */
 function handleBearerTokenSave(formData: { identifier: string; name: string; bearerToken: string }) {
-  const serverInfo = parseUrl(formData.identifier)
-
   const newServer = serverStore.addServer({
-    identifier: formData.identifier,
-    name: formData.name,
-    baseUrl: serverInfo.baseUrl,
     authType: 'bearer',
     bearerToken: formData.bearerToken,
-    oauth2: {
-      clientId: '',
-      clientSecret: '',
-      redirectUri: redirectUri.value,
-    }
+    userInput: formData.identifier,
   })
 
   serverStore.setAuthStatus(newServer.id, 'authorized')
-
-  step.value = 'success'
-
-  // Set as active server and navigate to detail page
   serverStore.setActiveServer(newServer.id)
 
+  step.value = 'success'
   setTimeout(() => {
     void router.push(`/servers/${newServer.id}`)
-  }, 1000)
+  }, 800)
 }
 
 /**
  * Handle bearer token form cancel
  */
 function handleBearerTokenCancel() {
-  step.value = 'auth-type'
-}
-
-/**
- * Handle manual form submission
- */
-// FIXME
-// @ts-expect-error FIXME
-function handleFormSave(formData) {
-  const serverInfo = parseUrl(formData.identifier)
-
-  const newServer = serverStore.addServer({
-    identifier: formData.identifier,
-    name: formData.name,
-    baseUrl: serverInfo.baseUrl,
-    authType: formData.authType,
-    oauth2: formData.oauth2
-  })
-
-  serverStore.setAuthStatus(newServer.id, 'configured')
-
-  step.value = 'success'
-  
-  // Set as active server and navigate to detail page
-  serverStore.markServerForAutoAuth(newServer.id)
-  serverStore.setActiveServer(newServer.id)
-  
-  setTimeout(() => {
-    void router.push(`/servers/${newServer.id}`)
-  }, 1000)
-}
-
-/**
- * Handle cancel
- */
-function handleFormCancel() {
-  void router.push('/servers')
+  if (hasAuthChoice.value) {
+    step.value = 'auth-type'
+  } else {
+    void router.push('/servers')
+  }
 }
 
 /**
@@ -224,15 +150,7 @@ function handleFormCancel() {
 function handleBackToAuthType() {
   step.value = 'auth-type'
   identifier.value = ''
-  discoveryError.value = null
-}
-
-/**
- * Handle back to identifier input
- */
-function handleBackToIdentifier() {
-  step.value = 'identifier'
-  discoveryError.value = null
+  identifierError.value = null
 }
 </script>
 
@@ -303,12 +221,12 @@ function handleBackToIdentifier() {
         v-show="step === 'identifier'"
         class="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 mb-6 animate-fadeIn"
       >
-        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">Authorization Server</h2>
+        <h2 class="text-xl font-semibold text-gray-900 dark:text-white mb-6">OAuth2 Authorization Server</h2>
 
-        <form @submit.prevent="handleIdentifierSubmit" class="space-y-4">
+        <form @submit.prevent="handleAuthServerOriginSubmit" class="space-y-4">
           <div>
             <label for="server-identifier" class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Enter server domain or full URL
+              Enter server domain, actor URI, or Fediverse/WebFinger handle:
             </label>
             <input
               id="server-identifier"
@@ -320,8 +238,10 @@ function handleBackToIdentifier() {
             />
             <p class="mt-2 text-sm text-gray-500 dark:text-gray-400">
               Format: <code class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">example.com</code> or
-              <code class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">https://example.com:8080</code>
+              <code class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">https://example.com:8080</code> or
+              <code class="bg-gray-100 dark:bg-gray-800 px-2 py-1 rounded">@user@domain</code>
             </p>
+            <p v-if="identifierError" class="mt-2 text-sm text-red-600 dark:text-red-400">{{ identifierError }}</p>
           </div>
 
           <button
@@ -333,7 +253,7 @@ function handleBackToIdentifier() {
           </button>
         </form>
 
-        <div class="mt-4 text-center">
+        <div v-if="hasAuthChoice" class="mt-4 text-center">
           <button
             @click="handleBackToAuthType"
             class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
@@ -343,81 +263,7 @@ function handleBackToIdentifier() {
         </div>
       </div>
 
-      <!-- Step 2: Discovering -->
-      <div v-show="step === 'discovering'" class="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 animate-fadeIn">
-        <div class="text-center space-y-4">
-          <div class="inline-flex items-center justify-center w-16 h-16 bg-blue-100 dark:bg-blue-900/30 rounded-full">
-            <svg class="w-8 h-8 text-blue-600 dark:text-blue-400 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-medium text-gray-900 dark:text-white">Discovering server metadata...</h3>
-          <p class="text-gray-600 dark:text-gray-400">Attempting to retrieve OAuth2 configuration from {{ identifier }}</p>
-        </div>
-      </div>
-
-      <!-- Step 2.5: Registering Client -->
-      <div v-show="step === 'registering'" class="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-8 animate-fadeIn">
-        <div class="text-center space-y-4">
-          <div class="inline-flex items-center justify-center w-16 h-16 bg-green-100 dark:bg-green-900/30 rounded-full">
-            <svg class="w-8 h-8 text-green-600 dark:text-green-400 animate-spin" fill="none" viewBox="0 0 24 24">
-              <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-              <path
-                class="opacity-75"
-                fill="currentColor"
-                d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
-              ></path>
-            </svg>
-          </div>
-          <h3 class="text-lg font-medium text-gray-900 dark:text-white">Registering OAuth2 client...</h3>
-          <p class="text-gray-600 dark:text-gray-400">Automatically registering your application with {{ identifier }}</p>
-        </div>
-      </div>
-
-      <!-- Step 3: Discovery Failed, Show Edit Form -->
-      <div v-show="step === 'edit'" class="animate-fadeIn">
-        <div v-if="discoveryError" class="mb-6 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
-          <p class="text-sm font-medium text-amber-800 dark:text-amber-200">
-            <span class="font-bold">RFC 8414 Discovery Failed:</span>
-            {{ discoveryError }}
-          </p>
-          <p class="text-xs text-amber-700 dark:text-amber-300 mt-2">Please configure the server manually below.</p>
-        </div>
-
-        <OAuth2InitiateFlow
-          v-if="step === 'edit' && identifier.trim()"
-          :server="{
-            identifier,
-            name: '',
-            baseUrl: parseUrl(identifier).baseUrl,
-            authType: 'oauth2',
-            oauth2: {
-              clientId: '',
-              clientSecret: '',
-              redirectUri: redirectUri,
-              scopes: 'read write follow'
-            }
-          }"
-          @save="handleFormSave"
-          @cancel="handleFormCancel"
-        />
-
-        <div class="mt-4 text-center">
-          <button
-            @click="handleBackToIdentifier"
-            class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"
-          >
-            ← Change server identifier
-          </button>
-        </div>
-      </div>
-
-      <!-- Step 3.5: Bearer Token Configuration -->
+      <!-- Bearer Token Configuration -->
       <div v-show="step === 'edit-bearer'" class="animate-fadeIn">
         <BearerTokenForm
           :identifier="identifier"
@@ -425,7 +271,7 @@ function handleBackToIdentifier() {
           @cancel="handleBearerTokenCancel"
         />
 
-        <div class="mt-4 text-center">
+        <div v-if="hasAuthChoice" class="mt-4 text-center">
           <button
             @click="handleBackToAuthType"
             class="text-sm text-blue-600 hover:text-blue-700 dark:text-blue-400 dark:hover:text-blue-300 transition-colors"

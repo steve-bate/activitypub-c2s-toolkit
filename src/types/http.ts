@@ -7,6 +7,7 @@ export interface HttpRequestData<TParams = unknown> {
 
 export interface HttpResponseData<TParams = unknown> {
   status_code: number
+  status_text?: string,
   headers: Record<string, string>
   payload?: TParams
 }

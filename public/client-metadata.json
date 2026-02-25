@@ -1,0 +1,8 @@
+{
+  "client_id": "https://apclient.stevebate.dev/client-metadata.json",
+  "client_name": "ActivityPub C2S Toolkit",
+  "redirect_uris": [
+    "https://apclient.stevebate.dev/callback"
+  ],
+  "scope": "read write profile follow"
+}

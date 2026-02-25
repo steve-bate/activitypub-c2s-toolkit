@@ -1,116 +1,75 @@
 import { defineStore } from 'pinia'
 import { ref, computed, Ref } from 'vue'
-import type { AuthServerDiscoveryResult, AuthServerMetadata } from '@/services/authServerDiscoveryService'
-import type { NodeInfo, NodeInfoDataExchange, NodeInfoIndex, NodeInfoIndexExchange } from '@/services/nodeinfoService'
-import type { WebFingerData, WebFingerExchange } from '@/services/webfingerService'
-import { TokenExchangeHttpExchange, TokenResponsePayload } from '@/services/authorizationService'
-import { Actor } from '@/services/actorDiscoveryService'
-import { ClientRegistrationMethod, ClientRegistrationResult } from '@/services/clientRegistrationService'
+import type { AuthorizationServerDiscoveryResult } from '@/services/authServerDiscoveryService'
+import type { NodeInfoDataExchange, NodeInfoIndexExchange } from '@/services/nodeinfoService'
+import { ClientConfig, TokenExchangeHttpExchange, TokenRefreshHttpExchange, TokenRevocationHttpExchange } from '@/services/authorizationService'
+import { ActorDiscoveryResult, ActorProfile } from '@/services/actorDiscoveryService'
+import { ClientRegistrationResult } from '@/services/clientRegistrationService'
 
-export type { AuthServerMetadata as ServerMetadata, NodeInfo, NodeInfoIndex, WebFingerData as WebFingerResponse }
 
 const STORAGE_KEY = 'c2s_servers'
 const AUTO_AUTH_KEY = 'c2s_auto_auth_server_id'
 
+// Recursively make all properties optional for deep partial updates
+type DeepPartial<T> = {
+  [P in keyof T]?: DeepPartial<T[P]>
+}
+
 // TODO Review these statuses
-export type AuthStatus = 'not-configured' | 'discovering-authserver' | 'authserver-configured' | 'authorized' | 'token-expired' | 'configured'
-export type AuthType = 'oauth2' | 'bearer'
-
-export interface HttpMeta {
-  status: number
-  statusText: string
-  duration: number
-  headers?: Record<string, string>
-}
-
-interface TokenEndpointMetadata {
-  token_endpoint_auth_method: string
-}
-export interface RegistrationExchange {
-  request: object
-  // FIXME
-  response?: TokenEndpointMetadata
-  timestamp: string
-  requestHeaders?: Record<string, string>
-  requestUrl?: string
-  httpMeta?: HttpMeta
-  responseRaw?: string
-}
-
-export interface OAuth2Config {
-  clientId: string
-  clientSecret: string
-  redirectUri: string
-  scopes: string
-  registrationMethod?: ClientRegistrationMethod
-  registrationExchange?: RegistrationExchange
-  registrationError?: string
-}
-
-export interface AuthorizationServerInfo {
-  metadata: AuthServerMetadata | null
-  method?: 'RFC8414' | 'Mastodon' | 'Manual'
-  status_code?: number
-  error?: string
-}
-
-// ...
-// auth
-// nodeinfo
-// webfinger
-// actor
-
+/*export*/ type AuthStatus = 'not-configured' | 'discovering-authserver' | 'authserver-configured' | 'authorized' | 'token-expired' | 'configured'
+/*export*/ type AuthType = 'oauth2' | 'bearer'
 
 export interface NodeInfoData {
   index: NodeInfoIndexExchange | null
   data: NodeInfoDataExchange | null
 }
 
-export interface OAuth2Data {
-  authServerDiscovery?: AuthServerDiscoveryResult
+/*export*/ interface OAuth2Data {
+  authServerOrigin: string
+  userInput?: string
+  authServerDiscovery?: AuthorizationServerDiscoveryResult
+  clientConfig?: ClientConfig
   clientRegistration?: ClientRegistrationResult
+  authCode?: string
+  tokenExchange?: TokenExchangeHttpExchange | TokenRefreshHttpExchange | TokenRevocationHttpExchange
 }
 
 export interface AuthData {
+  authType: AuthType
+  authStatus?: AuthStatus
+  bearerToken?: string
   oauth2?: OAuth2Data
 }
+
 export interface ResourceServerMetadata {
   id: string // generated unique ID for this server configuration
-  name: string
-  baseUrl: string
-
-  authType: AuthType
-  authStatus: AuthStatus
-  bearerToken: string | null
-
-  // Timestamps
-  createdAt: string
-  lastUsed: string | null
-
+ 
   // User input for OAuth2 flow
-  identifier: string
+  // TODO Remove
+  name?: string
+  identifier?: string
 
   auth?: AuthData
 
-  // TODO Remove
-  oauth2: OAuth2Config
+  actor?: {
+    profile: ActorProfile,
+    discovery: ActorDiscoveryResult
+  }
 
-  authCode: string | null
-  tokenResponse: TokenResponsePayload | null
-  tokenExchange?: TokenExchangeHttpExchange
-  actor?: Actor
-  actorError?: string
   nodeinfo?: NodeInfoData
-  // TODO Not sure if this is used`
-  webfinger?: WebFingerExchange
+
+  // Timestamps
+  createdAt: string
+  lastUsed?: string
 }
 
-export interface ServerInput {
-  name?: string
-  identifier?: string
-  baseUrl?: string
-  authType?: AuthType
-  oauth2?: Partial<OAuth2Config>
+/*export*/ interface ServerInput {
+  authServerOrigin?: string
+  authType: AuthType
+  userInput?: string
+  // name?: string
+  // identifier?: string
+  // clientConfig?: Partial<ClientConfig>
   bearerToken?: string
 }
 
@@ -160,32 +119,25 @@ export const useServerStore = defineStore('server', () => {
    * Create a new server with initial configuration
    */
   function addServer(serverData: ServerInput): ResourceServerMetadata {
+    let name: string
+    try {
+      name = serverData.authServerOrigin ? new URL(serverData.authServerOrigin).hostname : 'Unknown Server'
+    } catch {
+      name = serverData.authServerOrigin || 'Unknown Server'
+    }
+
     const newServer: ResourceServerMetadata = {
-      id: String(Date.now()),
-      name: serverData.name || '',
-      identifier: serverData.identifier || '', // scheme://domain[:port]
-      baseUrl: serverData.baseUrl || '',
-      authType: serverData.authType || 'oauth2',
-      authStatus: 'not-configured', // not-configured | discovering | configured | authorized
-      createdAt: new Date().toISOString(),
-      lastUsed: null,
-      
-      // OAuth2 configuration
-      oauth2: {
-        clientId: serverData.oauth2?.clientId || '',
-        clientSecret: serverData.oauth2?.clientSecret || '',
-        redirectUri: serverData.oauth2?.redirectUri || '',
-        scopes: serverData.oauth2?.scopes || 'read write follow'
+      id: crypto.randomUUID(),
+      name,
+      auth: {
+        authType: serverData.authType,
+        bearerToken: serverData.bearerToken,
+        oauth2: {
+          authServerOrigin: serverData.authServerOrigin || '',
+          userInput: serverData.userInput,
+        }
       },
-      
-      // Bearer token configuration
-      bearerToken: serverData.bearerToken || null,
-      
-      // OAuth2 authorization endpoint response
-      authCode: null,
-      
-      // Token exchange response
-      tokenResponse: null
+      createdAt: new Date().toISOString()
     }
     
     servers.value.push(newServer)
@@ -194,12 +146,34 @@ export const useServerStore = defineStore('server', () => {
   }
 
   /**
+   * Deep merge updates into target object
+   */
+  function deepMerge<T extends object>(target: T, updates: DeepPartial<T>): T {
+    const result = { ...target }
+    for (const key in updates) {
+      const updateValue = updates[key]
+      if (updateValue !== undefined) {
+        if (updateValue !== null && typeof updateValue === 'object' && !Array.isArray(updateValue)) {
+          const targetValue = target[key as keyof T]
+          result[key as keyof T] = deepMerge(targetValue as object, updateValue as object) as T[keyof T]
+        } else {
+          result[key as keyof T] = updateValue as T[keyof T]
+        }
+      }
+      else {
+        delete result[key as keyof T]
+      }
+    }
+    return result
+  }
+
+  /**
    * Update server configuration
    */
-  function updateServer(id: string, updates: Partial<ResourceServerMetadata>): ResourceServerMetadata | null {
+  function updateServerProperties(id: string, updates: DeepPartial<ResourceServerMetadata>): ResourceServerMetadata | null {
     const index = servers.value.findIndex(s => s.id === id)
     if (index !== -1) {
-      servers.value[index] = { ...servers.value[index], ...updates }
+      servers.value[index] = deepMerge(servers.value[index], updates)
       persistServers()
       return servers.value[index]
     }
@@ -301,90 +275,95 @@ export const useServerStore = defineStore('server', () => {
   /**
    * Save RFC 8414 discovery metadata with method and response details
    */
-  function saveAuthServerDiscoveryResult(
+  function saveAuthorizationServerDiscoveryResult(
     serverId: string,
-    discoveryResult: AuthServerDiscoveryResult,
+    discoveryResult: AuthorizationServerDiscoveryResult,
   ): ResourceServerMetadata | null {
-    const server = servers.value.find((s) => s.id === serverId);
-    if (server) {
-      updateServerProperty(serverId, 'auth.oauth2.authServerDiscovery', discoveryResult)
-      persistServers()
-      return server
-    }
-    return null
+    return updateServerProperty(serverId, 'auth.oauth2.authServerDiscovery', discoveryResult)
   }
 
+  function clearAuthorizationServerDiscoveryResult(serverId: string): void {
+    updateServerProperty(serverId, 'auth.oauth2.authServerDiscovery', undefined)
+  }
+
+  function saveClientRegistrationResult(serverId: string, registrationResult: ClientRegistrationResult): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'auth.oauth2.clientRegistration', registrationResult)
+  }
+
+  function saveClientConfig(serverId: string, clientConfig: ClientConfig): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'auth.oauth2.clientConfig', clientConfig)
+  }
 
   /**
    * Save authorization code from OAuth2 flow
    */
   function saveAuthCode(serverId: string, code: string): ResourceServerMetadata | null {
-    return updateServerProperty(serverId, 'authCode', code)
+    return updateServerProperty(serverId, 'auth.oauth2.authCode', code)
   }
 
   /**
    * Save token exchange response
    */
-  function saveTokenExchange(serverId: string, tokenExchange: TokenExchangeHttpExchange): ResourceServerMetadata | null {
-    updateServerProperty(serverId, 'tokenResponse', tokenExchange.response?.payload ?? null)
-    if (tokenExchange.request) {
-      updateServerProperty(serverId, 'tokenExchange', tokenExchange)
-    }
-    return updateServer(serverId, { 
-      authStatus: 'authorized',
-      lastUsed: new Date().toISOString()
-    })
-  }
-
-  /**
-   * Save actor information
-   */
-  function saveActorInfo(serverId: string, actor: Actor): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
-    if (server) {
-      server.actor = actor
-      server.actorError = undefined
-      persistServers()
-      return server
-    }
-    return null
-  }
-
-  /**
-   * Save actor error
-   */
-  function saveActorError(serverId: string, error: string): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
-    if (server) {
-      server.actorError = error
-      persistServers()
-      return server
-    }
-    return null
+  function saveTokenExchange(
+    serverId: string,
+    tokenExchange: TokenExchangeHttpExchange | TokenRefreshHttpExchange | TokenRevocationHttpExchange,
+  ): ResourceServerMetadata | null {
+    updateServerProperty(serverId, "auth.oauth2.tokenExchange", tokenExchange);
+    return updateServerProperties(serverId, {
+      auth: {
+        authStatus: "authorized",
+      },
+      lastUsed: new Date().toISOString(),
+    });
   }
 
   /**
    * Save bearer token
    */
   function saveBearerToken(serverId: string, token: string): ResourceServerMetadata | null {
-    return updateServer(serverId, { 
-      bearerToken: token,
-      authStatus: 'authorized',
+    return updateServerProperties(serverId, {
+      auth: {
+        bearerToken: token,
+        authStatus: 'authorized',
+      },
       lastUsed: new Date().toISOString()
     })
   }
 
+  function saveActorDiscovery(serverId: string, actorDiscovery: ActorDiscoveryResult): ResourceServerMetadata | null {
+    updateServerProperty(serverId, 'actor.discovery', actorDiscovery)
+    return updateServerProperty(serverId, 'actor.profile', actorDiscovery.actor)
+  }
+
   /**
-   * Clear token and auth data
+   * Clear OAuth2 token exchange data
    */
-  function clearToken(serverId: string): ResourceServerMetadata | null {
-    return updateServer(serverId, { 
-      bearerToken: null,
-      tokenResponse: null,
-      authCode: null,
+  function clearOAuthToken(serverId: string): ResourceServerMetadata | null {
+    return updateServerProperties(serverId, {
+      auth: {
+        authStatus: 'not-configured',
+        oauth2: {
+          tokenExchange: undefined,
+        },
+      },
       actor: undefined,
-      actorError: undefined,
-      authStatus: 'not-configured'
+    })
+  }
+
+  /**
+   * Save token revocation as a successful exchange
+   * Also clears actor data and resets auth status
+   */
+  function saveTokenRevocation(
+    serverId: string,
+    revocationExchange: TokenRevocationHttpExchange
+  ): ResourceServerMetadata | null {
+    updateServerProperty(serverId, 'auth.oauth2.tokenExchange', revocationExchange)
+    return updateServerProperties(serverId, {
+      auth: {
+        authStatus: 'not-configured',
+      },
+      actor: undefined,
     })
   }
 
@@ -392,7 +371,7 @@ export const useServerStore = defineStore('server', () => {
    * Update server authStatus
    */
   function setAuthStatus(serverId: string, status: AuthStatus): ResourceServerMetadata | null {
-    return updateServer(serverId, { authStatus: status })
+    return updateServerProperties(serverId, { auth: { authStatus: status } })
   }
 
   /**
@@ -403,66 +382,34 @@ export const useServerStore = defineStore('server', () => {
     dataExchange?: NodeInfoDataExchange,
     indexExchange?: NodeInfoIndexExchange,
   ): ResourceServerMetadata | null {
-    const server = servers.value.find((s) => s.id === serverId);
-    if (server) {
-      server.nodeinfo = {
-        index: indexExchange || null,
-        data: dataExchange || null
-      };
-      persistServers();
-      return server;
-    }
-    return null;
+    return updateServerProperty(serverId, 'nodeinfo', {
+      index: indexExchange || null,
+      data: dataExchange || null,
+    })
   }
 
-  /**
-   * Clear NodeInfo data
-   */
-  function clearNodeInfo(serverId: string): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
-    if (server) {
-      server.nodeinfo = undefined
-      persistServers()
-      return server
-    }
-    return null
-  }
-
-  /**
-   * Clear WebFinger data
-   */
-  function clearWebFinger(serverId: string): ResourceServerMetadata | null {
-    const server = servers.value.find(s => s.id === serverId)
-    if (server) {
-      server.webfinger = undefined
-      persistServers()
-      return server
-    }
-    return null
-  }
 
   return {
     servers,
     activeServerId,
     activeServer,
     addServer,
-    updateServer,
-    updateServerProperty,
     deleteServer,
     setActiveServer,
     markServerForAutoAuth,
     consumeAutoAuthForServer,
-    saveDiscoveryMetadata: saveAuthServerDiscoveryResult,
+    saveDiscoveryMetadata: saveAuthorizationServerDiscoveryResult,
+    saveClientRegistrationResult,
+    saveClientConfig,
     saveAuthCode,
-    saveAuthServerDiscoveryResult,
-    saveTokenResponse: saveTokenExchange,
-    saveActorInfo,
-    saveActorError,
+    saveAuthorizationServerDiscoveryResult,
+    clearAuthorizationServerDiscoveryResult,
+    saveTokenExchange,
     saveBearerToken,
-    clearToken,
+    saveActorDiscovery,
+    clearOAuthToken,
+    saveTokenRevocation,
     setAuthStatus,
-    saveNodeInfo,
-    clearNodeInfo,
-    clearWebFinger
+    saveNodeInfo
   }
 })

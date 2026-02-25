@@ -12,16 +12,16 @@
 
 import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
 
-export interface NodeInfoLink {
+/*export*/ interface NodeInfoLink {
   rel: string
   href: string
 }
 
-export interface NodeInfoIndex {
+/*export*/ interface NodeInfoIndex {
   links: NodeInfoLink[]
 }
 
-export interface NodeInfo {
+/*export*/ interface NodeInfo {
   version: string
   software: {
     name: string
@@ -47,23 +47,11 @@ export interface NodeInfo {
   metadata?: Record<string, unknown>
 }
 
-export interface HttpRequestResult {
+/*export*/ interface HttpRequestResult {
   status: number
   statusText: string
   headers: Record<string, string>
   url: string
-}
-
-export interface NodeInfoIndexResult {
-  status: 'success' | 'error'
-  data?: NodeInfoIndex
-  error?: string
-  httpRequest?: HttpRequestResult
-}
-
-export interface NodeInfoResult {
-  indexResult: NodeInfoIndexResult
-  dataResult?: NodeInfoDataResponse
 }
 
 export type NodeInfoIndexRequest = HttpRequestData;
@@ -138,6 +126,7 @@ async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexExchang
         error: `Failed to fetch NodeInfo index: HTTP ${response.status} ${response.statusText}`,
         response: {
           status_code: response.status,
+          status_text: response.statusText,
           headers: httpRequest.headers,
         },
       }
@@ -153,6 +142,7 @@ async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexExchang
         error: 'Invalid NodeInfo index format: missing or invalid links array',
         response: {
           status_code: response.status,
+          status_text: response.statusText,
           headers: httpRequest.headers,
         }
       }
@@ -163,6 +153,7 @@ async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexExchang
       success: true,
       response: {
         status_code: response.status,
+        status_text: response.statusText,
         headers: httpRequest.headers,
         payload: data,
       }
@@ -235,6 +226,7 @@ async function fetchNodeInfo(url: string): Promise<NodeInfoDataExchange> {
         error: `Failed to fetch NodeInfo: HTTP ${response.status} ${response.statusText}`,
         response: {
           status_code: response.status,
+          status_text: response.statusText,
           headers: httpRequest.headers,
         }
       }
@@ -251,6 +243,7 @@ async function fetchNodeInfo(url: string): Promise<NodeInfoDataExchange> {
         error: 'Invalid NodeInfo format: missing software name or version',
         response: {
           status_code: response.status,
+          status_text: response.statusText,
           headers: httpRequest.headers,
           payload: data
         }
@@ -261,6 +254,7 @@ async function fetchNodeInfo(url: string): Promise<NodeInfoDataExchange> {
       success: true,
       response: {
         status_code: response.status,
+        status_text: response.statusText,
         headers: httpRequest.headers,
         payload: data
       }
@@ -319,21 +313,3 @@ export async function getNodeInfo(baseUrl: string)
   ]
 }
 
-/**
- * Clear cache for a specific server or all servers
- */
-export function clearNodeInfoCache(baseUrl?: string): void {
-  if (baseUrl) {
-    // Clear cache for specific server
-    cache.delete(`nodeinfo-index:${baseUrl}`)
-    // Clear all nodeinfo data URLs that start with this baseUrl
-    for (const key of cache.keys()) {
-      if (key.startsWith(`nodeinfo-data:${baseUrl}`)) {
-        cache.delete(key)
-      }
-    }
-  } else {
-    // Clear all cache
-    cache.clear()
-  }
-}

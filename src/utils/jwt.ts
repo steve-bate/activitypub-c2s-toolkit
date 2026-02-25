@@ -26,7 +26,7 @@ function decodeBase64Url(base64url: string): string {
  * @returns The decoded JWT payload
  * @throws Error if the token format is invalid
  */
-export function decodeJWT(token: string): Record<string, unknown> {
+function decodeJWT(token: string): Record<string, unknown> {
   const parts = token.split('.')
   if (parts.length !== 3) {
     throw new Error('Invalid JWT format')

@@ -8,5 +8,8 @@ export default defineConfig({
     alias: {
       '@': fileURLToPath(new URL('./src', import.meta.url))
     }
+  },
+  server: {
+    allowedHosts: ['localhost', 'apclient.stevebate.dev']
   }
 })

@@ -1,51 +1,79 @@
 <script setup lang="ts">
+import { nextTick, ref, watch } from 'vue'
 import { JsonViewer } from 'vue3-json-viewer'
 import 'vue3-json-viewer/dist/vue3-json-viewer.css'
-import HttpRequestPanel from '@/components/http/HttpRequestPanel.vue'
-import HttpResponsePanel from '@/components/http/HttpResponsePanel.vue'
-import { useThemeStore } from '@/stores/themeStore'
+import { useSettingsStore } from '@/stores/settingsStore'
 
 const emit = defineEmits<{
-  fetchUri: [uri: string]
+  fetchUri: [uri: string, property?: string]
 }>()
 
-defineProps({
+const props = defineProps({
   data: {
     type: Object,
-    default: null
-  },
-  requestUrl: {
-    type: String,
-    default: null
-  },
-  requestHeaders: {
-    type: Object,
-    default: null
-  },
-  responseStatus: {
-    type: Number,
-    default: null
-  },
-  responseStatusText: {
-    type: String,
-    default: null
-  },
-  responseHeaders: {
-    type: Object,
-    default: null
-  },
-  duration: {
-    type: Number,
     default: null
   }
 })
 
-const themeStore = useThemeStore()
+const settingsStore = useSettingsStore()
+const jsonViewerContainer = ref<HTMLElement | null>(null)
+
+function collapseJsonLdContext() {
+  const container = jsonViewerContainer.value
+  if (!container) {
+    return
+  }
+
+  const keys = container.querySelectorAll<HTMLElement>('.jv-key')
+  for (const key of keys) {
+    if (key.textContent?.trim() !== '@context:') {
+      continue
+    }
+
+    const node = key.closest('.jv-node.toggle')
+    if (!node) {
+      continue
+    }
+
+    let ancestorCount = 0
+    let parentNode = node.parentElement?.closest('.jv-node.toggle')
+    while (parentNode) {
+      ancestorCount += 1
+      parentNode = parentNode.parentElement?.closest('.jv-node.toggle')
+    }
+
+    if (ancestorCount !== 1) {
+      continue
+    }
+
+    const toggle = node.querySelector<HTMLElement>(':scope > .jv-toggle')
+    if (toggle?.classList.contains('open')) {
+      toggle.click()
+    }
+    return
+  }
+}
+
+function scheduleContextCollapse() {
+  void nextTick(() => {
+    collapseJsonLdContext()
+    setTimeout(collapseJsonLdContext, 0)
+  })
+}
+
+watch(
+  () => props.data,
+  () => {
+    scheduleContextCollapse()
+  },
+  { deep: true, immediate: true }
+)
 
 /**
  * Handle click events to detect and emit URL clicks
  */
 function handleClick(event: MouseEvent) {
+  // TODO provide the link generation function from the parent component
   const target = event.target as HTMLElement
   
   // Traverse up the DOM tree to find the jv-string element
@@ -60,7 +88,18 @@ function handleClick(event: MouseEvent) {
       if (/^https?:\/\/.+/.test(text)) {
         event.preventDefault()
         event.stopPropagation()
-        emit('fetchUri', text)
+        
+        // Try to find the property key for this value
+        let propertyName: string | undefined
+        const node = element.closest('.jv-node')
+        if (node) {
+          const keyElement = node.querySelector('.jv-key')
+          if (keyElement) {
+            propertyName = keyElement.textContent?.trim().replace(/:$/, '') || undefined
+          }
+        }
+        
+        emit('fetchUri', text, propertyName)
         return
       }
       break
@@ -73,13 +112,13 @@ function handleClick(event: MouseEvent) {
 <template>
   <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 shadow-sm">
     <div>
-      <div v-if="data" class="font-mono text-sm" @click="handleClick">
+      <div v-if="data" ref="jsonViewerContainer" class="font-mono text-sm" @click="handleClick">
         <!-- https://github.com/qiuquanwu/vue3-json-viewer -->
         <JsonViewer
           :value="data"
-          :theme="themeStore.isDark ? 'dark': 'light'"
-          :darkMode="themeStore.isDark"
-          :expandDepth="3"
+          :theme="settingsStore.isDark ? 'dark': 'light'"
+          :darkMode="settingsStore.isDark"
+          :expandDepth="4"
           :copyable="true"
           class="json-viewer-wrapper"
         />
@@ -87,19 +126,6 @@ function handleClick(event: MouseEvent) {
       <div v-else class="text-center py-12 text-gray-400 dark:text-gray-500">
         No data yet. Make a request to see the response.
       </div>
-    </div>
-    <div class="border-t border-gray-200 dark:border-gray-700 mt-4 pt-4 px-4">
-      <HttpRequestPanel 
-        :url="requestUrl"
-        :headers="requestHeaders"
-      />
-    </div>
-    <div class="border-t border-gray-200 dark:border-gray-700 mt-4 pt-4 px-4 pb-4">
-      <HttpResponsePanel 
-        :status="responseStatus"
-        :status-text="responseStatusText"
-        :headers="responseHeaders"
-      />
     </div>
   </div>
 </template>

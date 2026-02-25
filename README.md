@@ -10,9 +10,12 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 
 - 🌐 Fully browser-based
 - 🔐 OAuth 2.0 authorization support with diagnostic features
-- 🐘 Support for Mastodon legacy OAuth2 techniques
-- 🔍 Actor discovery using multiple techniques
+- 🔑 Support for OAuth2 CIMD
+- 🛡️ Support for OAuth2 Protected Resource Metadata 
+- 🐘 Support for Mastodon legacy OAuth2 implementation
+- 🔍 Authorized actor discovery using multiple methods
 - 📡 Direct interaction with ActivityPub servers via C2S API
+- 👁️ ActivityPub object preview and actions
 - 🔌 Supports NodeInfo and WebFinger APIs
 - 📊 JSON browser for inspecting ActivityPub objects
 - 🌙 Dark mode
@@ -29,23 +32,9 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 ## Roadmap
 
 - Advanced resource editors
-- Support for more activity types
-- Built-in tests, runner, and report generation.
-- Add support for Protected Resource metadata and CIMD.
-
-## Technologies
-
-- **Frontend Framework**: Vue 3 with TypeScript
-- **Build Tool**: Vite
-- **Styling**: Tailwind CSS
-- **Routing**: Vue Router
-- **State Management**: Pinia (stores)
-- **Code Quality**: ESLint
-
-## Prerequisites
-
-- Node.js (version 16 or higher recommended)
-- npm or yarn package manager
+- Pluggable AP object previews and actions
+- Support for more activity and object types
+- Built-in C2S server tests with a runner and report generator.
 
 ## Installation
 
@@ -60,17 +49,32 @@ cd activitypub-c2s-toolkit
 npm install
 ```
 
-## Development
-
-Start the development server:
+3. Start the development server
 
 ```bash
 npm run dev
 ```
 
+## Development
+
+### Technologies
+
+- **Frontend Framework**: Vue 3 with TypeScript
+- **Build Tool**: Vite
+- **Styling**: Tailwind CSS
+- **Routing**: Vue Router
+- **State Management**: Pinia (stores)
+- **Code Quality**: ESLint
+
+### Prerequisites
+
+- Node.js (version 16 or higher recommended)
+- npm or yarn package manager
+
+
 The application will be available at `http://localhost:5173` (or another port if 5173 is in use).
 
-## Building
+### Building
 
 Create a production build:
 
@@ -80,7 +84,7 @@ npm run build
 
 The built files will be in the `dist` directory.
 
-## Preview Production Build
+### Preview Production Build
 
 Preview the production build locally:
 
@@ -88,31 +92,32 @@ Preview the production build locally:
 npm run preview
 ```
 
-## Contributing
-
-Contributions are welcome! Please feel free to submit a Pull Request.
-
-1. Fork the repository
-2. Create your feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add some amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
 
-## About ActivityPub C2S
-
-This toolkit implements the [ActivityPub](https://www.w3.org/TR/activitypub/) Client-to-Server (C2S) protocol, enabling web clients to interact directly with ActivityPub servers for creating, reading, updating, and deleting social media content.
-
 ## Author
 
-**Steve Bate**
+**[Steve Bate](https://github.com/steve-bate)**
 
-## Acknowledgments
+## References
 
-- [ActivityPub Specification](https://www.w3.org/TR/activitypub/)
-- [W3C Social Web Working Group](https://www.w3.org/wiki/Socialwg)
+### ActivityPub and Activity Streams
 
----
+- [ActivityPub](https://www.w3.org/TR/activitypub/) - W3C Recommendation
+- [Activity Streams 2.0](https://www.w3.org/TR/activitystreams-core/) - W3C Recommendation
+- [Activity Vocabulary](https://www.w3.org/TR/activitystreams-vocabulary/) - W3C Recommendation
+- [ActivityPub HTTP API Task Force](https://github.com/swicg/activitypub-http-api) - SWICG Repository
+
+### OAuth 2.0 Specifications
+
+- [RFC 6749](https://www.rfc-editor.org/rfc/rfc6749.html) - The OAuth 2.0 Authorization Framework
+- [RFC 6750](https://www.rfc-editor.org/rfc/rfc6750.html) - OAuth 2.0 Bearer Token Usage
+- [RFC 7591](https://www.rfc-editor.org/rfc/rfc7591.html) - OAuth 2.0 Dynamic Client Registration Protocol
+- [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636.html) - Proof Key for Code Exchange (PKCE)
+- [RFC 8414](https://www.rfc-editor.org/rfc/rfc8414.html) - OAuth 2.0 Authorization Server Metadata
+- [OAuth 2.0 Client-Initiated Metadata Document (CIMD)](https://datatracker.ietf.org/doc/html/draft-ietf-oauth-client-id-metadata-document) - IETF Draft
+- [OAuth 2.0 Protected Resource Metadata](https://www.ietf.org/archive/id/draft-ietf-oauth-resource-metadata-09.html) - IETF Draft
+- [IndieAuth](https://indieauth.spec.indieweb.org/) - IndieWeb OAuth 2.0 extension (defines `me` parameter)
+
+

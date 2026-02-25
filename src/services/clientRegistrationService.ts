@@ -4,26 +4,10 @@
  */
 
 import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
-import { UrlComponents } from "./authServerDiscoveryService"
 
-export type ClientRegistrationMethod = 'RFC7591' | 'Mastodon' | 'Manual' | "N/A"
+export type ClientRegistrationMethod = 'RFC7591' | 'Mastodon' | 'Pre-registered' | "CIMD" | "N/A"
 
-export interface ClientMetadata {
-  client_name?: string
-  client_uri?: string
-  logo_uri?: string
-  redirect_uris: string[]
-  grant_types?: string[]
-  response_types?: string[]
-  scope?: string
-  contacts?: string[]
-  tos_uri?: string
-  policy_uri?: string
-  software_id?: string
-  software_version?: string
-}
-
-export interface ClientRegistrationData {
+/*export*/ interface ClientRegistrationData {
   client_id: string
   client_secret?: string
   client_id_issued_at?: number
@@ -43,7 +27,7 @@ export interface ClientRegistrationData {
   registration_access_token?: string
 }
 
-export interface ClientRegistrationParams
+/*export*/ interface ClientRegistrationParams
 {
   client_name: string
   redirect_uris: string[] | string
@@ -54,9 +38,13 @@ export interface ClientRegistrationParams
 type ClientRegistrationRequest = HttpRequestData<ClientRegistrationParams>;
 type ClientRegistrationResponse = HttpResponseData<ClientRegistrationData>;
 type ClientRegistrationExchange = HttpExchange<ClientRegistrationRequest, ClientRegistrationResponse>
-export interface ClientRegistrationResult {
+export  interface ClientRegistrationResult {
   registrationMethod?: ClientRegistrationMethod
-  exchange: ClientRegistrationExchange
+  exchange?: ClientRegistrationExchange
+}
+
+function deepCopy<T>(value: T): T {
+  return structuredClone(value);
 }
 
 /**
@@ -64,7 +52,7 @@ export interface ClientRegistrationResult {
  * using RFC 7591 Dynamic Client Registration or Mastodon API
  */
 export async function registerClient(
-  serverInfo: UrlComponents,
+  authServerUrl: URL,
   registrationEndpoint: string | undefined,
   params: ClientRegistrationParams
 ): Promise<ClientRegistrationResult> {
@@ -77,20 +65,47 @@ export async function registerClient(
   try {
     let registrationMethod: ClientRegistrationMethod = "RFC7591";
 
-    if (!isDefined(registrationEndpoint) || registrationEndpoint?.includes('/api/v1/apps')) {
-      // No endpoint in metadata, try Mastodon-style registration
-      registrationEndpoint = `${serverInfo.baseUrl}/api/v1/apps`
+    if (!isDefined(registrationEndpoint)) {
+      console.log("No registration endpoint in metadata, trying Mastodon-style registration")
+      registrationEndpoint = `${authServerUrl.origin}/api/v1/apps`
       registrationMethod = "Mastodon";
+      params = deepCopy(params)
+      // Patch redirect_uris for Mastodon-compatibility
+      params.client_name = params.client_name || 'ActivityPub C2S Client'
+      //delete params.scopes - Mitra uses it
+      delete params.scope
+      params.redirect_uris = Array.isArray(params.redirect_uris) ? params.redirect_uris[0] : params.redirect_uris
     }
 
-    console.debug(`Registering client at: ${registrationEndpoint}`)
-    console.debug('Registration request:', params)
+    console.debug(`Attempting client registration: ${registrationEndpoint}`, registrationMethod, params)
 
-    const response = await fetch(registrationEndpoint!, {
+    let response = await fetch(registrationEndpoint!, {
       method: 'POST',
       headers: requestHeaders,
       body: JSON.stringify(params)
     })
+
+    // If JSON-encoded request fails, retry with form encoding
+    if (!response.ok) {
+      console.log("JSON registration failed, retrying with form-encoded body")
+      const formParams = new URLSearchParams()
+      for (const [key, value] of Object.entries(params)) {
+        if (value !== undefined) {
+          if (Array.isArray(value)) {
+            value.forEach(v => formParams.append(key, v))
+          } else {
+            formParams.set(key, String(value))
+          }
+        }
+      }
+      requestHeaders['Content-Type'] = 'application/x-www-form-urlencoded'
+      delete requestHeaders.Accept
+      response = await fetch(registrationEndpoint!, {
+        method: 'POST',
+        headers: requestHeaders,
+        body: formParams.toString()
+      })
+    }
 
     // Capture response headers (including CORS headers when exposed)
     const headersObj: Record<string, string> = {}
@@ -98,26 +113,10 @@ export async function registerClient(
       headersObj[key] = value
     })
 
-    const corsHeaderNames = [
-      'access-control-allow-origin',
-      'access-control-allow-credentials',
-      'access-control-allow-headers',
-      'access-control-allow-methods',
-      'access-control-expose-headers',
-      'access-control-max-age'
-    ]
-
-    corsHeaderNames.forEach((name) => {
-      if (headersObj[name]) return
-      const value = response.headers.get(name)
-      if (value) {
-        headersObj[name] = value
-      }
-    })
-
     if (!response.ok) {
       const errorText = await response.text()
       let errorMessage = `HTTP ${response.status}: ${response.statusText}`
+      console.error('Client registration failed:', errorMessage)
       
       try {
         const errorJson = JSON.parse(errorText)
@@ -131,7 +130,6 @@ export async function registerClient(
         }
       }
 
-      console.error('Client registration failed:', errorMessage)
       return {
         registrationMethod,
         exchange: {
@@ -144,6 +142,7 @@ export async function registerClient(
           },
           response: {
             status_code: response.status,
+            status_text: response.statusText,
             headers: headersObj,
           }
         }
@@ -172,15 +171,16 @@ export async function registerClient(
         },
         response: {
           status_code: response.status,
+          status_text: response.statusText,
           headers: headersObj,
           payload: data
         }
       },
     }
   } catch (error) {
-    console.error('Client registration error:', error)
+    console.error('Client registration exception:', error)
     return {
-      registrationMethod: 'RFC7591',
+      registrationMethod: "N/A",
       exchange: {
         success: false,
         error: error instanceof Error ? error?.message : 'Network error during client registration',

@@ -20,7 +20,7 @@ function formatAuthStatus(status: string): string {
   }
 }
 
-function formatLastUsed(dateString: string | null): string {
+function formatLastUsed(dateString: string | undefined): string {
   if (!dateString) return '—'
   const date = new Date(dateString)
   return date.toLocaleString()
@@ -55,7 +55,7 @@ function formatLastUsed(dateString: string | null): string {
       <tbody class="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
         <tr v-if="serverStore.servers.length === 0">
           <td colspan="6" class="px-6 py-8 text-center text-gray-500 dark:text-gray-400">
-            No servers configured yet. <RouterLink to="/servers/new" class="text-blue-600 dark:text-blue-400 hover:underline font-medium">Add one now</RouterLink>.
+            No servers configured yet.
           </td>
         </tr>
         <tr v-for="server in serverStore.servers" :key="server.id" class="hover:bg-gray-50 dark:hover:bg-gray-700/50">
@@ -68,13 +68,13 @@ function formatLastUsed(dateString: string | null): string {
             </RouterLink>
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300 font-mono">
-            {{ server.baseUrl }}
+            {{ server.auth?.oauth2?.authServerOrigin ?? '—' }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
-            {{ server.authType === 'oauth2' ? 'OAuth2' : 'Bearer' }}
+            {{ server.auth?.authType === 'oauth2' ? 'OAuth2' : 'Bearer' }}
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
-            {{ formatAuthStatus(server.authStatus) }}
+          <td class="px-6 py-4 whitespace-nowrap text-sm" :class="server.auth?.authStatus === 'authorized' ? 'text-green-600 dark:text-green-400 font-medium' : server.auth?.authStatus === 'token-expired' ? 'text-gray-700 dark:text-gray-300' : 'text-orange-600 dark:text-orange-400 font-medium'">
+            {{ formatAuthStatus(server.auth?.authStatus!) }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
             {{ formatLastUsed(server.lastUsed) }}

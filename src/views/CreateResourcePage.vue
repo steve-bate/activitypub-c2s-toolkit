@@ -3,6 +3,7 @@ import { computed, ref, watch, onMounted } from 'vue'
 import { useServerStore } from '@/stores/serverStore'
 import { resolveHandle } from '@/services/webfingerService'
 import { syntaxHighlightJson } from '@/utils/jsonHighlighter'
+import RunningIcon from '@/components/icons/RunningIcon.vue'
 
 const serverStore = useServerStore()
 
@@ -121,6 +122,18 @@ const lastResponseBody = ref<string | null>(null)
 
 const STORAGE_KEY = 'activitypub-create-form-data'
 
+const activeActor = computed(() => serverStore.activeServer?.actor)
+const outboxUrl = computed(() => activeActor.value?.profile?.outbox || '')
+const outboxDisplay = computed(() => {
+  if (!outboxUrl.value) return ''
+  try {
+    const url = new URL(outboxUrl.value)
+    return `${url.pathname}${url.search}${url.hash}`
+  } catch {
+    return outboxUrl.value.replace(/^https?:\/\/[^/]+/i, '')
+  }
+})
+
 // Restore form data from localStorage on mount
 onMounted(() => {
   try {
@@ -185,18 +198,6 @@ watch(
   }
 )
 
-const activeActor = computed(() => serverStore.activeServer?.actor)
-const outboxUrl = computed(() => activeActor.value?.profile?.outbox || '')
-const outboxDisplay = computed(() => {
-  if (!outboxUrl.value) return ''
-  try {
-    const url = new URL(outboxUrl.value)
-    return `${url.pathname}${url.search}${url.hash}`
-  } catch {
-    return outboxUrl.value.replace(/^https?:\/\/[^/]+/i, '')
-  }
-})
-
 const highlightedRequestJson = computed(() => {
   if (!lastPostedPayload.value) return ''
   const formatted = JSON.stringify(lastPostedPayload.value, null, 2)
@@ -213,6 +214,20 @@ const highlightedResponseJson = computed(() => {
     // Not valid JSON, return as-is
     return ''
   }
+})
+
+const jsonPlaceholder = computed(() => {
+  return `{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "type": "Create",
+  "actor": "https://example.com/users/alice",
+  "object": {
+    "type": "Note",
+    "attributedTo": "https://example.com/users/alice",
+    "content": "Hello world",
+    "to": "https://www.w3.org/ns/activitystreams#Public"
+  }
+}`
 })
 
 /**
@@ -337,8 +352,8 @@ function resetForm() {
 }
 
 function getAccessToken(): string | null {
-  return serverStore.activeServer?.tokenResponse?.access_token ||
-    serverStore.activeServer?.bearerToken ||
+  return serverStore.activeServer?.auth?.oauth2?.tokenExchange?.response?.payload?.access_token ||
+    serverStore.activeServer?.auth?.bearerToken ||
     null
 }
 
@@ -355,7 +370,7 @@ async function handleSubmit() {
   resolvingHandles.value = true
   resolveStatus.value = ''
 
-  if (!activeActor.value?.uri) {
+  if (!activeActor.value?.profile.id) {
     errorMessage.value = 'No active actor is available for posting.'
     resolvingHandles.value = false
     return
@@ -427,7 +442,7 @@ async function handleSubmit() {
       }
 
       // Add attributedTo current actor
-      resource.attributedTo = activeActor.value.uri
+      resource.attributedTo = activeActor.value.profile.id
 
       if (submitNakedObject.value) {
         // Submit the object directly without wrapping in activity
@@ -437,7 +452,7 @@ async function handleSubmit() {
         activity = {
           '@context': 'https://www.w3.org/ns/activitystreams',
           type: 'Create',
-          actor: activeActor.value.uri,
+          actor: activeActor.value.profile.id,
           object: resource
         }
 
@@ -643,10 +658,7 @@ async function handleSubmit() {
 
           <div v-if="resolvingHandles" class="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
             <div class="flex items-center gap-2">
-              <svg class="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <RunningIcon/>
               <p class="text-sm text-blue-700 dark:text-blue-200">{{ resolveStatus }}</p>
             </div>
           </div>
@@ -771,17 +783,14 @@ async function handleSubmit() {
             <textarea
               v-model="rawJsonInput"
               rows="20"
-              placeholder='{\n  "@context": "https://www.w3.org/ns/activitystreams",\n  "type": "Create",\n  "actor": "...",\n  "object": {\n    "type": "Note",\n    "content": "Hello world"\n  }\n}'
+              :placeholder="jsonPlaceholder"
               class="w-full px-3 py-2 bg-white dark:bg-gray-900 border border-gray-300 dark:border-gray-700 rounded-md text-sm text-gray-900 dark:text-gray-100 font-mono"
             ></textarea>
           </div>
 
           <div v-if="resolvingHandles" class="p-3 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-md">
             <div class="flex items-center gap-2">
-              <svg class="w-4 h-4 animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-              </svg>
+              <RunningIcon/>
               <p class="text-sm text-blue-700 dark:text-blue-200">{{ resolveStatus }}</p>
             </div>
           </div>

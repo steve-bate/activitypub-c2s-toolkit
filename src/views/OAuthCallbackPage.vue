@@ -4,6 +4,7 @@ import { useRouter } from 'vue-router'
 import { parseAuthorizationCallback, validateState, exchangeCodeForToken } from '@/services/authorizationService'
 import { discoverActor } from '@/services/actorDiscoveryService'
 import { useServerStore } from '@/stores/serverStore'
+import RunningIcon from '@/components/icons/RunningIcon.vue'
 
 const router = useRouter()
 const serverStore = useServerStore()
@@ -41,8 +42,10 @@ onMounted(async () => {
     }
 
     const server = serverStore.servers.find(s => s.id === serverId)
-    const authServerMetadata = server?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
-    if (!server || !authServerMetadata || !server.oauth2) {
+    const authServerMetadata =
+      server?.auth?.oauth2?.authServerDiscovery?.authorizationServerMetadata ??
+      server?.auth?.oauth2?.authServerDiscovery?.exchange?.response?.payload
+    if (!server || !authServerMetadata || !server.auth?.oauth2) {
       status.value = 'error'
       message.value = 'Server configuration not found'
       errorDetails.value = 'Unable to find server configuration. Please try again.'
@@ -61,33 +64,38 @@ onMounted(async () => {
 
     // Exchange authorization code for access token
     const exchange = await exchangeCodeForToken({
-      serverId,
+      serverOrigin: serverId,
       authCode: callback.code,
-      serverMetadata: authServerMetadata,
-      oauth2Config: server.oauth2
+      authServerMetadata: authServerMetadata,
+      clientConfig: server.auth?.oauth2?.clientConfig
     })
 
     if (exchange.success && exchange.response) {
       // Save token response to store
-      serverStore.saveTokenResponse(serverId, exchange)
+      serverStore.saveTokenExchange(serverId, exchange)
       serverStore.saveAuthCode(serverId, callback.code)
       
       // Discover actor information
       message.value = 'Discovering actor information...'
+
+      const clientId = server.auth?.oauth2?.clientConfig?.clientId
+      const clientSecret = server.auth?.oauth2?.clientConfig?.clientSecret
+
       try {
-        const actorResult = await discoverActor(
+        const actorDiscovery = await discoverActor(
           exchange.response.payload!,
           authServerMetadata,
-          server.oauth2.clientId,
-          server.oauth2.clientSecret
+          clientId,
+          clientSecret
         )
-        
-        if (actorResult.success && actorResult.actor) {
-          serverStore.saveActorInfo(serverId, actorResult.actor)
-          console.log('Actor discovery successful:', actorResult.actor)
-        } else {
-          console.warn('Actor discovery failed:', actorResult.error)
+
+        serverStore.saveActorDiscovery(serverId, actorDiscovery)
+
+        if (!actorDiscovery.success) 
+        {
+          console.warn('Actor discovery failed:', !actorDiscovery.success)
         }
+
       } catch (error) {
         console.warn('Actor discovery error:', error)
         // Don't fail the whole flow if actor discovery fails
@@ -123,7 +131,7 @@ function handleRetry() {
   const serverId = sessionStorage.getItem('oauth_current_server_id')
   if (serverId) {
     serverStore.setActiveServer(serverId)
-    void router.push(`/servers/${serverId}`)
+    void router.push(`/servers/${serverId}/auth`)
   } else {
     void router.push('/servers')
   }
@@ -136,10 +144,7 @@ function handleRetry() {
       <!-- Processing State -->
       <div v-if="status === 'processing'" class="text-center">
         <div class="mb-4">
-          <svg class="w-16 h-16 mx-auto animate-spin text-blue-600 dark:text-blue-400" fill="none" viewBox="0 0 24 24">
-            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
-            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-          </svg>
+          <RunningIcon/>
         </div>
         <h1 class="text-2xl font-semibold text-gray-900 dark:text-gray-100 mb-2">
           {{ message }}

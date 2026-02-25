@@ -1,6 +1,7 @@
 // @ts-check
 import pluginVue from 'eslint-plugin-vue';
 import globals from 'globals';
+import { flatConfigs } from 'eslint-plugin-import-x';
 import {
   defineConfigWithVueTs,
   vueTsConfigs,
@@ -18,6 +19,9 @@ export default defineConfigWithVueTs(
   // Official Vue+TS recommended config (type-checked)
   vueTsConfigs.recommendedTypeChecked,
 
+  // Import/export linting
+  flatConfigs.recommended,
+
   // Project-specific tweaks
   {
     languageOptions: {
@@ -25,6 +29,14 @@ export default defineConfigWithVueTs(
         ...globals.browser,
         ...globals.node,
         ...globals.es2021,
+      },
+    },
+    settings: {
+      'import-x/resolver': {
+        typescript: {
+          alwaysTryTypes: true,
+          project: './tsconfig.json',
+        },
       },
     },
     rules: {
@@ -40,6 +52,8 @@ export default defineConfigWithVueTs(
       'vue/attribute-hyphenation': 'off',
       // Example extra rule you had
       'vue/no-unused-components': 'error',
+      // TypeScript rules
+      '@typescript-eslint/no-base-to-string': 'off',
     },
   },
 );

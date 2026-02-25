@@ -1,0 +1,4 @@
+{
+  "ignoreDependencies": ["typescript-eslint"],
+  "ignoreBinaries": ["check-unused-comp"]
+}
