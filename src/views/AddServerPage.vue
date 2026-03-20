@@ -5,6 +5,7 @@ import { useServerStore } from '@/stores/serverStore'
 import { useSettingsStore } from '@/stores/settingsStore'
 import BearerTokenForm from '@/components/BearerTokenForm.vue'
 import { resolveHandle as resolveWebFingerResource } from '@/services/webfingerService'
+import { fetchActorInfo } from '@/services/actorDiscoveryService'
 
 const router = useRouter()
 const serverStore = useServerStore()
@@ -35,6 +36,7 @@ function initialStep(): string {
 const step = ref(initialStep())
 const identifier = ref('')
 const identifierError = ref<string | null>(null)
+const bearerIdentifierError = ref<string | null>(null)
 
 // Restore saved identifier on mount so it is pre-filled when the identifier step is shown
 onMounted(() => {
@@ -117,11 +119,44 @@ async function handleAuthServerOriginSubmit() {
 /**
  * Handle bearer token form submission
  */
-function handleBearerTokenSave(formData: { identifier: string; name: string; bearerToken: string }) {
+async function handleBearerTokenSave(formData: { identifier: string; name: string; bearerToken: string }) {
+  bearerIdentifierError.value = null
+
+  const id = formData.identifier.trim()
+  let actorUri: string
+
+  if (id.startsWith('@')) {
+    const resolved = await resolveWebFingerResource(id)
+    if (!resolved) {
+      bearerIdentifierError.value = 'Failed to resolve WebFinger handle to an actor URI'
+      return
+    }
+    actorUri = resolved
+  } else if (id.startsWith('http://') || id.startsWith('https://')) {
+    actorUri = id
+  } else {
+    bearerIdentifierError.value = 'Identifier must be a WebFinger handle (@user@domain) or an HTTP(S) URL'
+    return
+  }
+
+  const actorFetchResult = await fetchActorInfo(actorUri, formData.bearerToken)
+  if (!actorFetchResult.success || !actorFetchResult.response?.payload) {
+    bearerIdentifierError.value = actorFetchResult.error ?? 'Failed to retrieve actor profile'
+    return
+  }
+  const actorProfile = actorFetchResult.response.payload
+
   const newServer = serverStore.addServer({
     authType: 'bearer',
     bearerToken: formData.bearerToken,
     userInput: formData.identifier,
+    // Used for some services like NodeInfo
+    // Probably shouldn't be called authServerOrigin
+    origin: new URL(actorUri).origin,
+    actor: {
+      profile: actorProfile,
+      discovery: { success: true, method: 'user' },
+    }
   })
 
   serverStore.setAuthStatus(newServer.id, 'authorized')
@@ -270,6 +305,7 @@ function handleBackToAuthType() {
           @save="handleBearerTokenSave"
           @cancel="handleBearerTokenCancel"
         />
+        <p v-if="bearerIdentifierError" class="mt-3 text-sm text-red-600 dark:text-red-400 text-center">{{ bearerIdentifierError }}</p>
 
         <div v-if="hasAuthChoice" class="mt-4 text-center">
           <button

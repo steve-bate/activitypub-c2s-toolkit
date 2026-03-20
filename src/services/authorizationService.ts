@@ -6,6 +6,7 @@
 
 import { HttpExchange, HttpRequestData, HttpResponseData } from '@/types/http'
 import type { AuthServerMetadata } from './authServerDiscoveryService'
+import { useServerStore } from '@/stores/serverStore'
 
 export interface ClientConfig {
   clientId: string
@@ -374,6 +375,9 @@ export async function exchangeCodeForToken(
     
     console.debug('Token exchange successful')
     
+    const store = useServerStore()
+    store.saveBearerToken(serverId, tokenResponse.access_token)
+
     // Clear PKCE parameters after successful exchange
     clearPKCEParameters(serverId)
     

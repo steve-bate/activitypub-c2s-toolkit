@@ -26,7 +26,8 @@ async function handleLoadNodeInfo() {
   isLoadingNodeInfo.value = true
   nodeinfoError.value = null
   try {
-    const origin = server.value.auth?.oauth2?.authServerOrigin ?? ''
+    // FIXME - shouldn't use authServerOrigin
+    const origin = server.value.origin ?? server.value.auth?.oauth2?.authServerOrigin ?? ''
     const [indexExchange, dataExchange] = await getNodeInfo(origin)
     serverStore.saveNodeInfo(server.value.id, dataExchange, indexExchange)
     if (!indexExchange?.success || !dataExchange?.success) {
@@ -102,10 +103,10 @@ watch(
             <a
               target="_blank"
               rel="noopener noreferrer"
-              :href="server.auth?.oauth2?.authServerOrigin"
+              :href="server.origin ?? server.auth?.oauth2?.authServerOrigin"
               class="hover:underline"
             >
-              {{ server.auth?.oauth2?.authServerOrigin }}
+              {{ server.origin ?? server.auth?.oauth2?.authServerOrigin }}
             </a>
           </h1>
         </div>

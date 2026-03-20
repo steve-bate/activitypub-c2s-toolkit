@@ -91,7 +91,7 @@ async function handleFetch(uri: string) {
     const requestHeadersData: Record<string, string> = {}
     
     // Add authorization if we have a token
-    const accessToken = activeServer?.auth?.oauth2?.tokenExchange?.response?.payload?.access_token;
+    const accessToken = activeServer?.auth?.bearerToken;
     if (accessToken) {
       requestHeadersData['Authorization'] = `Bearer ${accessToken}`
     }

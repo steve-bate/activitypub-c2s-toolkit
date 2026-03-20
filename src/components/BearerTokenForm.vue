@@ -32,10 +32,14 @@ const form = reactive({
 const errors = reactive<FormErrors>({})
 
 const isValid = computed(() => {
-  const hasErrors = Object.keys(errors).length > 0
-  const hasRequired = form.actorIdentifier.trim() && form.bearerToken.trim()
+  const hasErrors = !!errors.actorIdentifier || !!errors.bearerToken
+  const hasRequired = !!form.actorIdentifier.trim() && !!form.bearerToken.trim()
   return !hasErrors && hasRequired
 })
+
+function clearError(field: keyof FormErrors): void {
+  delete errors[field]
+}
 
 function validateField(field: keyof FormErrors): void {
   delete errors[field]
@@ -110,6 +114,7 @@ function handleCancel(): void {
           type="text"
           placeholder="@user@example.com or https://example.com/users/user"
           @blur="validateField('actorIdentifier')"
+          @input="clearError('actorIdentifier')"
           class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white"
         />
         <p v-if="errors.actorIdentifier" class="mt-1 text-sm text-red-600 dark:text-red-400">{{ errors.actorIdentifier }}</p>
@@ -129,6 +134,7 @@ function handleCancel(): void {
           v-model="form.bearerToken"
           placeholder="Paste your bearer token here"
           @blur="validateField('bearerToken')"
+          @input="clearError('bearerToken')"
           rows="4"
           class="mt-1 block w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md shadow-sm focus:outline-none focus:ring-blue-500 focus:border-blue-500 dark:bg-gray-800 dark:text-white font-mono text-sm"
         />

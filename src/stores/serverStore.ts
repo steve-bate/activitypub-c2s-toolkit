@@ -44,6 +44,8 @@ export interface AuthData {
 export interface ResourceServerMetadata {
   id: string // generated unique ID for this server configuration
  
+  origin?: string // The origin of the resource server (e.g. https://example.com)
+
   // User input for OAuth2 flow
   // TODO Remove
   name?: string
@@ -70,7 +72,12 @@ export interface ResourceServerMetadata {
   // name?: string
   // identifier?: string
   // clientConfig?: Partial<ClientConfig>
+  origin?: string // Resource server origin
   bearerToken?: string
+  actor?: {
+    profile: ActorProfile,
+    discovery: ActorDiscoveryResult
+  }
 }
 
 export const useServerStore = defineStore('server', () => {
@@ -120,25 +127,44 @@ export const useServerStore = defineStore('server', () => {
    */
   function addServer(serverData: ServerInput): ResourceServerMetadata {
     let name: string
-    try {
-      name = serverData.authServerOrigin ? new URL(serverData.authServerOrigin).hostname : 'Unknown Server'
-    } catch {
-      name = serverData.authServerOrigin || 'Unknown Server'
+    if (serverData.authType === 'bearer') {
+      try {
+        name = serverData.actor?.profile.id ? new URL(serverData.actor.profile.id).hostname : 'Unknown Server'
+      } catch {
+        // TODO maybe this should be an error
+        name = 'Unknown Server'
+      }
+    } else {
+      // TODO clean up the OAuth2 name -- although most servers will not have separate auth server
+      try {
+        name = serverData.authServerOrigin ? new URL(serverData.authServerOrigin).hostname : 'Unknown Server'
+      } catch {
+        name = serverData.authServerOrigin || 'Unknown Server'
+      }
     }
 
     const newServer: ResourceServerMetadata = {
       id: crypto.randomUUID(),
       name,
+      origin: serverData.origin,
       auth: {
         authType: serverData.authType,
-        bearerToken: serverData.bearerToken,
-        oauth2: {
-          authServerOrigin: serverData.authServerOrigin || '',
-          userInput: serverData.userInput,
-        }
+        ...(serverData.authType === "bearer"
+          ? {
+              bearerToken: serverData.bearerToken,
+              userInput: serverData.userInput,
+            }
+          : {
+              oauth2: {
+                authServerOrigin: serverData.authServerOrigin || "",
+                userInput: serverData.userInput,
+              },
+            }),
       },
-      createdAt: new Date().toISOString()
-    }
+      ...(serverData.actor ? { actor: serverData.actor } : {}),
+      createdAt: new Date().toISOString(),
+      lastUsed: new Date().toISOString(),
+    };
     
     servers.value.push(newServer)
     persistServers()

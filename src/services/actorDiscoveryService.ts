@@ -28,7 +28,7 @@ export interface ActorProfile {
   };
 }
 
-export type ActorDiscoveryMethod = 'token_response' | 'introspection' | 'verify_credentials' | 'jwt'
+export type ActorDiscoveryMethod = 'token_response' | 'introspection' | 'verify_credentials' | 'jwt' | "user";
 
 /*export*/ interface IntrospectionData {
   me?: string; // Custom property to indicate actor URI  
@@ -219,7 +219,7 @@ async function getActorUriFromMastodon(
 /**
  * Fetch full actor information from ActivityPub actor endpoint
  */
-async function fetchActorInfo(actorUri: string, accessToken?: string): 
+export async function fetchActorInfo(actorUri: string, accessToken?: string): 
     Promise<ActorFetchExchange> 
 {
   const headers: HeadersInit = {

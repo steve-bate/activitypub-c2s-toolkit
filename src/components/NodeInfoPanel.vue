@@ -16,7 +16,7 @@ const emit = defineEmits<{
 }>()
 
 const nodeinfoIndexUrl = computed(() => {
-  const baseUrl = props.server.auth?.oauth2?.authServerOrigin?.replace(/\/+$/, '')
+  const baseUrl = props.server.origin?.replace(/\/+$/, '')
   if (!baseUrl) return null
   return `${baseUrl}/.well-known/nodeinfo`
 })

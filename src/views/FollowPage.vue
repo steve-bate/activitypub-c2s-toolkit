@@ -205,10 +205,8 @@ async function resolveActor() {
   }
 }
 
-function getAccessToken(): string | null {
-  return serverStore.activeServer?.auth?.oauth2?.tokenExchange?.response?.payload?.access_token ||
-    serverStore.activeServer?.auth?.bearerToken ||
-    null
+function getAccessToken(): string | undefined {
+  return serverStore.activeServer?.auth?.bearerToken
 }
 
 /**

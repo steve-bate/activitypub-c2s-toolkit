@@ -119,9 +119,7 @@ export function useObjectActions(options: UseObjectActionsOptions) {
 
   const accessToken = computed(() => {
     return (
-      serverStore.activeServer?.auth?.oauth2?.tokenExchange?.response?.payload?.access_token ||
-      serverStore.activeServer?.auth?.bearerToken ||
-      ''
+      serverStore.activeServer?.auth?.bearerToken
     )
   })
 
