@@ -92,26 +92,24 @@ async function handleFetch(uri: string) {
     
     // Add authorization if we have a token
     const accessToken = activeServer?.auth?.bearerToken;
-    if (accessToken) {
+    if (accessToken && activeServer.origin && uri.startsWith(activeServer.origin)) {
       requestHeadersData['Authorization'] = `Bearer ${accessToken}`
     }
     
-    // Try with Accept header first
+    const fetchHeaders: Record<string, string> = {
+      ...requestHeadersData,
+      'Accept': 'application/activity+json'
+    }
+
     let response: Response
-    let finalRequestHeaders = { ...requestHeadersData }
     try {
-      const fetchHeaders = {
-        ...requestHeadersData,
-        'Accept': 'application/activity+json'
-      }
-      finalRequestHeaders = { ...fetchHeaders }
       response = await fetch(uri, { headers: fetchHeaders })
     } catch (err) {
       // If CORS error (likely due to Accept header), retry without it
       if (err instanceof Error && (err.message?.includes('CORS') || err.name === 'TypeError')) {
-        console.warn('CORS error with Accept header, retrying without custom Accept header')
-        finalRequestHeaders = { ...requestHeadersData }
-        response = await fetch(uri, { headers: requestHeadersData })
+        console.warn('Possible CORS error with Accept header, retrying without Accept header')
+        delete fetchHeaders['Accept']
+        response = await fetch(uri, { headers: fetchHeaders })
       } else {
         throw err
       }
@@ -124,7 +122,7 @@ async function handleFetch(uri: string) {
         error: `HTTP ${response.status} ${response.statusText}`,
         request: {
           url: uri,
-          headers: finalRequestHeaders
+          headers: fetchHeaders
         },
         response: {
           status_code: response.status,
@@ -150,7 +148,7 @@ async function handleFetch(uri: string) {
       success: true,
       request: {
         url: uri,
-        headers: finalRequestHeaders
+        headers: fetchHeaders
       },
       response: {
         status_code: response.status,
