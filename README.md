@@ -22,7 +22,7 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 - 🎨 Modern UI built with Vue 3 and Tailwind CSS
 - 🚀 Fast development with Vite
 
-## Screeenshots
+## Screenshots
 
 [![Add Server](docs/add-server-tn.png)](docs/add-server.png)&nbsp;&nbsp;&nbsp;&nbsp;[![OAuth Diagnostics](docs/oauth2-diagnostics-tn.png)](docs/oauth2-diagnostics.png)
 
