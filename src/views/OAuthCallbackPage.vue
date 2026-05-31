@@ -91,8 +91,7 @@ onMounted(async () => {
 
         serverStore.saveActorDiscovery(serverId, actorDiscovery)
 
-        if (!actorDiscovery.success) 
-        {
+        if (!actorDiscovery.success) {
           console.warn('Actor discovery failed:', !actorDiscovery.success)
         }
 

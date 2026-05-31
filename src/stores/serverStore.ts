@@ -357,6 +357,10 @@ export const useServerStore = defineStore('server', () => {
   }
 
   function saveActorDiscovery(serverId: string, actorDiscovery: ActorDiscoveryResult): ResourceServerMetadata | null {
+    if (actorDiscovery.success && actorDiscovery.actor?.id) {
+      const origin = new URL(actorDiscovery.actor.id).origin
+      updateServerProperty(serverId, 'origin', origin)
+    }
     updateServerProperty(serverId, 'actor.discovery', actorDiscovery)
     return updateServerProperty(serverId, 'actor.profile', actorDiscovery.actor)
   }

@@ -26,6 +26,9 @@ export interface ActorProfile {
   image?: {
     url: string;
   };
+  endpoints?: {
+    proxyUrl?: string; // Custom property for proxying requests through the server
+  };
 }
 
 export type ActorDiscoveryMethod = 'token_response' | 'introspection' | 'verify_credentials' | 'jwt' | "user";

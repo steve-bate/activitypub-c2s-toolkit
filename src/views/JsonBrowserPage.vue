@@ -75,6 +75,85 @@ function handleClickedUri(uri: string, property?: string) {
   void router.push({ name: 'json', query })
 }
 
+async function handleProxyFetch(proxyUrl: string, targetUri: string) {
+  isLoading.value = true
+  error.value = null
+  responseData.value = undefined
+  httpExchange.value = undefined
+
+  try {
+    const body = new URLSearchParams()
+    body.append('id', targetUri)
+
+    const fetchHeaders: Record<string, string> = {
+      'Content-Type': 'application/x-www-form-urlencoded',
+      'Accept': 'application/activity+json'
+    }
+
+    const activeServer = serverStore.activeServer
+    const accessToken = activeServer?.auth?.bearerToken;
+    if (accessToken) {
+      fetchHeaders['Authorization'] = `Bearer ${accessToken}`
+    }
+
+    const response = await fetch(proxyUrl, {
+      method: 'POST',
+      headers: fetchHeaders,
+      body
+    })
+    
+    if (!response.ok) {
+      error.value = `Proxy HTTP ${response.status} ${response.statusText}`
+      httpExchange.value = {
+        success: false,
+        error: `Proxy HTTP ${response.status} ${response.statusText}`,
+        request: {
+          url: proxyUrl,
+          headers: fetchHeaders,
+          //body: formData
+        },
+        response: {
+          status_code: response.status,
+          status_text: response.statusText,
+          headers: response.headers ? Object.fromEntries(response.headers.entries()) : {}
+        }
+      }
+      return
+    }
+    
+    // Capture response headers
+    const responseHeadersObj: Record<string, string> = {}
+    response.headers.forEach((value, key) => {
+      responseHeadersObj[key] = value
+    })
+    
+    const data = await response.json()
+    
+    responseData.value = data
+    
+    // Build HTTP exchange object
+    httpExchange.value = {
+      success: true,
+      request: {
+        url: proxyUrl,
+        headers: fetchHeaders,
+        //body: { url: targetUri }
+      },
+      response: {
+        status_code: response.status,
+        status_text: response.statusText,
+        headers: responseHeadersObj,
+        payload: data
+      }
+    }
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to fetch URI through proxy'
+    console.error('Proxy fetch error:', err)
+  } finally {
+    isLoading.value = false
+  }
+} 
+
 /**
  * Fetch URI with ActivityPub headers and access token
  */
@@ -94,6 +173,9 @@ async function handleFetch(uri: string) {
     const accessToken = activeServer?.auth?.bearerToken;
     if (accessToken && activeServer.origin && uri.startsWith(activeServer.origin)) {
       requestHeadersData['Authorization'] = `Bearer ${accessToken}`
+    }
+    else if (activeServer?.actor?.profile.endpoints?.proxyUrl) {
+      return handleProxyFetch(activeServer?.actor?.profile.endpoints?.proxyUrl, uri)
     }
     
     const fetchHeaders: Record<string, string> = {
