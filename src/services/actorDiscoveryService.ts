@@ -43,6 +43,7 @@ type IntrospectionExchange = HttpExchange<IntrospectionRequest, IntrospectionRes
 
 /*export*/ interface MastodonAccount {
   uri?: string
+  acct?: string
   actor_id?: string // Mitra
 }
 
@@ -182,10 +183,15 @@ async function getActorUriFromMastodon(
       const account: MastodonAccount = await response.json()
       
       // Mastodon account object has: id, username, acct, display_name, url, avatar, etc.
-      const actorUri = account.uri || account.actor_id /*Mitra*/
+      let actorUri = account.uri || account.actor_id /*Mitra*/
+      // Hack alert - Apparently Mastodon 4.6 provides a non-dereferenceable uri value
+      console.debug("Actor URI in verify_credentials response:", actorUri)
+      if (actorUri && /\/users\/\d+$/.test(actorUri)) {
+        actorUri = `${normalizedBaseUrl}/users/${account.acct}`
+        console.debug('Actor URI inferred from Mastodon account:', actorUri)
+      }
       if (actorUri) {
-        account.uri = actorUri // Ensure uri is set for later use (Mitra compatibility)
-        console.debug('Actor found via verify_credentials:', actorUri)
+        account.uri = actorUri // Ensure uri is set for later use
         return {
           success: true,
           request: { url: actorUri, headers },
@@ -356,7 +362,6 @@ export async function discoverActor(
   }
 
   // Always fetch full actor details from the actor URI to get complete information
-  console.debug('Fetching complete actor document for URI:', actorUri)
   const actorFetchExchange = await fetchActorInfo(actorUri, tokenResponse.access_token)
   
   if (!actorFetchExchange.success) {
