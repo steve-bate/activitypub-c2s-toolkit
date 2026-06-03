@@ -2,6 +2,7 @@
 import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useServerStore } from '@/stores/serverStore'
+import ActorEndpointsPanel from '@/components/ActorEndpointsPanel.vue'
 import NodeInfoPanel from '@/components/NodeInfoPanel.vue'
 import { getNodeInfo } from '@/services/nodeinfoService'
 
@@ -167,6 +168,8 @@ watch(
         @load="handleLoadNodeInfo"
         @refresh="handleLoadNodeInfo"
       />
+
+      <ActorEndpointsPanel :server="server" />
 
       <!-- Danger Zone -->
       <div class="bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800 p-6">
