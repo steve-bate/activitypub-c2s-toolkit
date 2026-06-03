@@ -7,6 +7,7 @@ import AddServerPage from '@/views/AddServerPage.vue'
 import OAuthCallbackPage from '@/views/OAuthCallbackPage.vue'
 import CreateResourcePage from '@/views/CreateResourcePage.vue'
 import FollowPage from '@/views/FollowPage.vue'
+import UploadMediaPage from '@/views/UploadMediaPage.vue'
 import SettingsPage from '@/views/SettingsPage.vue'
 import ObjectActionStatusPage from '@/views/ObjectActionStatusPage.vue'
 
@@ -57,6 +58,11 @@ const router = createRouter({
       path: '/follow',
       name: 'follow',
       component: FollowPage
+    },
+    {
+      path: '/upload-media',
+      name: 'upload-media',
+      component: UploadMediaPage
     },
     {
       path: '/settings',

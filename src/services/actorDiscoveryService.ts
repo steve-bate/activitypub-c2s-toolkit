@@ -28,6 +28,7 @@ export interface ActorProfile {
   };
   endpoints?: {
     proxyUrl?: string; // Custom property for proxying requests through the server
+    uploadMedia?: string;
   };
 }
 
@@ -169,7 +170,7 @@ async function getActorUriFromMastodon(
 
   const headers = {
         'Authorization': `Bearer ${accessToken}`,
-        'Accept': 'application/activity+json'
+        'Accept': 'application/json'
       }
 
   try {

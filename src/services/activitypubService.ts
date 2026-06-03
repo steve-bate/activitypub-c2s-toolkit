@@ -21,9 +21,29 @@ interface PostActivityParams {
   accessToken: string
 }
 
+interface PostMediaUploadParams {
+  uploadMediaUrl: string
+  object: ActivityStreamsObject
+  file: File
+  accessToken: string
+}
+
 type ActivityRequest = HttpRequestData<ActivityStreamsObject>
 type ActivityResponse = HttpResponseData<ActivityStreamsObject | string>
 type ActivityExchange = HttpExchange<ActivityRequest, ActivityResponse>
+
+type MediaUploadRequestPayload = {
+  object: ActivityStreamsObject
+  file: {
+    name: string
+    type: string
+    size: number
+  }
+}
+
+type MediaUploadRequest = HttpRequestData<MediaUploadRequestPayload>
+type MediaUploadResponse = HttpResponseData<ActivityStreamsObject | string>
+type MediaUploadExchange = HttpExchange<MediaUploadRequest, MediaUploadResponse>
 
 /**
  * Post an activity to an actor's outbox
@@ -73,6 +93,98 @@ export async function postActivityToOutbox(params: PostActivityParams): Promise<
     }
 
     const responseData: ActivityResponse = {
+      status_code: response.status,
+      status_text: response.statusText,
+      headers: responseHeaders,
+      payload: responsePayload
+    }
+
+    if (!response.ok) {
+      return {
+        success: false,
+        error: `HTTP ${response.status} ${response.statusText}${responseText ? `: ${responseText}` : ''}`,
+        request: requestData,
+        response: responseData
+      }
+    }
+
+    return {
+      success: true,
+      request: requestData,
+      response: responseData
+    }
+  } catch (error) {
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : String(error),
+      request: requestData
+    }
+  }
+}
+
+/**
+ * Upload media to an actor's uploadMedia endpoint using multipart/form-data.
+ *
+ * Follows the SocialCG ActivityPub MediaUpload technique where the form includes:
+ * - file: uploaded media
+ * - object: shell ActivityStreams object
+ */
+export async function postMediaToUploadEndpoint(params: PostMediaUploadParams): Promise<MediaUploadExchange> {
+  const { uploadMediaUrl, object, file, accessToken } = params
+
+  const headers = {
+    'Authorization': `Bearer ${accessToken}`,
+    'Accept': 'application/activity+json, application/json'
+  }
+
+  const requestData: MediaUploadRequest = {
+    url: uploadMediaUrl,
+    headers: {
+      ...headers,
+      'Authorization': `Bearer ${accessToken.substring(0, 20)}...`
+    },
+    params: {
+      object,
+      file: {
+        name: file.name,
+        type: file.type,
+        size: file.size
+      }
+    },
+    timestamp: new Date().toISOString()
+  }
+
+  const formData = new FormData()
+  formData.append(
+    'object',
+    new Blob([JSON.stringify(object)], {
+      type: 'application/ld+json'
+    })
+  )
+  formData.append('file', file, file.name)
+
+  try {
+    const response = await fetch(uploadMediaUrl, {
+      method: 'POST',
+      headers,
+      body: formData
+    })
+
+    const responseHeaders: Record<string, string> = {}
+    response.headers.forEach((value, key) => {
+      responseHeaders[key] = value
+    })
+
+    const responseText = await response.text()
+    let responsePayload: ActivityStreamsObject | string
+
+    try {
+      responsePayload = JSON.parse(responseText)
+    } catch {
+      responsePayload = responseText
+    }
+
+    const responseData: MediaUploadResponse = {
       status_code: response.status,
       status_text: response.statusText,
       headers: responseHeaders,

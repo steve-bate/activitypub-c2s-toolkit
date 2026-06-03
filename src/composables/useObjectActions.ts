@@ -159,6 +159,12 @@ export function useObjectActions(options: UseObjectActionsOptions) {
     }
 
     try {
+      const token = accessToken.value
+      if (!token) {
+        actionError.value = 'Missing access token for this action.'
+        return
+      }
+
       const activity = type === 'Like'
         ? createLikeActivity(activeActorId.value, objectUri.value)
         : createAnnounceActivity(activeActorId.value, objectUri.value)
@@ -166,7 +172,7 @@ export function useObjectActions(options: UseObjectActionsOptions) {
       const exchange = await postActivityToOutbox({
         outboxUrl: outboxUrl.value,
         activity,
-        accessToken: accessToken.value
+        accessToken: token
       })
 
       const success = exchange.success
