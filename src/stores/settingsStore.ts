@@ -14,6 +14,7 @@ const SETTINGS_KEY = 'c2s_app_settings'
   }
   /** When true, each OAuth2 step runs automatically once its prerequisites are satisfied. */
   oauth2AutoRun: boolean
+  corsDiagnosticsUrl?: string
   /** Theme preference: 'light', 'dark', or 'system' */
   theme: 'light' | 'dark' | 'system'
 }
@@ -112,6 +113,14 @@ export const useSettingsStore = defineStore('settings', () => {
     settings.value.oauth2AutoRun = enabled
   }
 
+  function setCorsDiagnosticUrl(endpoint: string | undefined | null): void {
+    if (!endpoint) {
+      delete settings.value.corsDiagnosticsUrl
+      return
+    }
+    settings.value.corsDiagnosticsUrl = endpoint
+  }
+
   function toggleTheme(): void {
     // Cycle through: light -> dark -> light (no system mode in toggle)
     settings.value.theme = settings.value.theme === 'dark' ? 'light' : 'dark'
@@ -133,6 +142,7 @@ export const useSettingsStore = defineStore('settings', () => {
     setAuthMethod,
     setOAuth2Defaults,
     setOAuth2AutoRun,
+    setCorsDiagnosticUrl,
     toggleTheme,
   }
 })

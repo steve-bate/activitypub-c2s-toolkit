@@ -247,7 +247,7 @@ async function handleCorsDiagnostics(req: IncomingMessage, res: ServerResponse, 
     const requestOrigin = payload.origin ?? corsResult.origin
     const effectiveHeaders = normalizeRequestHeaders({ headers: payload.headers, body: payload.body })
     const preflightRequired = needsPreflight(normalizedMethod, effectiveHeaders)
-  const includeBody = shouldIncludeBody(requestUrl)
+    const includeBody = shouldIncludeBody(requestUrl)
 
     let preflightResponse
     let preflightDiagnostics
@@ -304,7 +304,7 @@ async function handleCorsDiagnostics(req: IncomingMessage, res: ServerResponse, 
 
     console.info(
       JSON.stringify({
-        event: 'cors-diagnostics.request',
+        event: 'diagnostics.request',
         targetUrl: response.targetUrl,
         method: response.request.method,
         requestHeaders: response.request.headers,
@@ -328,7 +328,8 @@ const server = createServer((req, res) => {
   void (async () => {
     const requestUrl = new URL(req.url ?? '/', 'http://localhost')
 
-    if (requestUrl.pathname === '/cors-diagnostics' && req.method === 'OPTIONS') {
+    console.log('Incoming request:', req.method, requestUrl.pathname)
+    if (requestUrl.pathname === '/diagnostics' && req.method === 'OPTIONS') {
       handlePreflight(req, res, config)
       return
     }
@@ -344,7 +345,7 @@ const server = createServer((req, res) => {
       return
     }
 
-    if (requestUrl.pathname === '/cors-diagnostics' && req.method === 'POST') {
+    if (requestUrl.pathname === '/diagnostics' && req.method === 'POST') {
       await handleCorsDiagnostics(req, res, requestUrl)
       return
     }

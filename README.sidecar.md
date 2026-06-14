@@ -37,10 +37,10 @@ Environment variables:
 Endpoints:
 
 - `GET /health` — Health check endpoint
-- `POST /cors-diagnostics` — CORS diagnostics endpoint (simulates preflight when needed)
-- `OPTIONS /cors-diagnostics` — CORS preflight for diagnostics endpoint
+- `POST /diagnostics` — CORS diagnostics endpoint (simulates preflight when needed)
+- `OPTIONS /diagnostics` — CORS preflight for diagnostics endpoint
 
-`POST /cors-diagnostics` JSON payload shape:
+`POST /diagnostics` JSON payload shape:
 
 ```json
 {

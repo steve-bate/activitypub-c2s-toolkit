@@ -11,6 +11,13 @@ const oauth2Scopes = ref(settingsStore.settings.oauth2Defaults.scopes)
 function handleSaveOAuth2Defaults() {
   settingsStore.setOAuth2Defaults(oauth2ClientName.value, oauth2Scopes.value)
 }
+
+const corsDiagnosticUrl = ref(settingsStore.settings.corsDiagnosticsUrl)
+
+function saveCorsDiagnosticUrl() {
+  settingsStore.setCorsDiagnosticUrl(corsDiagnosticUrl.value)
+}
+
 </script>
 
 <template>
@@ -180,6 +187,29 @@ function handleSaveOAuth2Defaults() {
         />
         <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
           Space-separated list of default OAuth2 scopes
+        </p>
+      </div>
+    </div>
+
+    <!-- CORS Diagnostic Server section -->
+    <div class="mt-6 rounded-lg border border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
+      <div class="px-5 py-3">
+        <h3 class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">CORS Diagnostic Server</h3>
+      </div>
+      <!-- Server endpoint -->
+      <div class="px-5 py-4">
+        <label class="block text-sm font-medium text-gray-900 dark:text-gray-100 mb-1">
+          Endpoint
+        </label>
+        <input
+          v-model="corsDiagnosticUrl"
+          @blur="saveCorsDiagnosticUrl"
+          type="text"
+          placeholder="http://localhost:8080"
+          class="w-full px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-gray-100 placeholder-gray-500 dark:placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+        />
+        <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+          Endpoint for the CORS diagnostic server
         </p>
       </div>
     </div>
