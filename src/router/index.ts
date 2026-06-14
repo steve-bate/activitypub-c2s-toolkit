@@ -10,6 +10,7 @@ import FollowPage from '@/views/FollowPage.vue'
 import UploadMediaPage from '@/views/UploadMediaPage.vue'
 import SettingsPage from '@/views/SettingsPage.vue'
 import ObjectActionStatusPage from '@/views/ObjectActionStatusPage.vue'
+import ServerTestPage from '../views/ServerTestPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -73,6 +74,11 @@ const router = createRouter({
       path: '/object-action-status',
       name: 'object-action-status',
       component: ObjectActionStatusPage
+    },
+    {
+      path: '/tests',
+      name: 'test-harness',
+      component: ServerTestPage
     }
   ]
 })

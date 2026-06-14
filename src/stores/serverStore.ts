@@ -5,6 +5,7 @@ import type { NodeInfoDataExchange, NodeInfoIndexExchange } from '@/services/nod
 import { ClientConfig, TokenExchangeHttpExchange, TokenRefreshHttpExchange, TokenRevocationHttpExchange } from '@/services/authorizationService'
 import { ActorDiscoveryResult, ActorProfile } from '@/services/actorDiscoveryService'
 import { ClientRegistrationResult } from '@/services/clientRegistrationService'
+import type { HarnessRunResult } from '@/testing/core/types'
 
 
 const STORAGE_KEY = 'c2s_servers'
@@ -41,6 +42,16 @@ export interface AuthData {
   oauth2?: OAuth2Data
 }
 
+export interface ServerTestingConfig {
+  sidecarUrl?: string
+  selectedTests?: string[]
+  results?: HarnessRunResult
+}
+
+export interface ServerTestingConfigInput {
+  sidecarUrl?: string
+}
+
 export interface ResourceServerMetadata {
   id: string // generated unique ID for this server configuration
  
@@ -59,6 +70,8 @@ export interface ResourceServerMetadata {
   }
 
   nodeinfo?: NodeInfoData
+
+  testing?: ServerTestingConfig
 
   // Timestamps
   createdAt: string
@@ -100,7 +113,7 @@ export const useServerStore = defineStore('server', () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
-        return JSON.parse(stored)
+        return JSON.parse(stored) as ResourceServerMetadata[]
       }
     } catch (e) {
       console.error('Failed to load servers from localStorage:', e)
@@ -418,6 +431,34 @@ export const useServerStore = defineStore('server', () => {
     })
   }
 
+  function saveHarnessConfig(serverId: string, config: ServerTestingConfigInput): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'testing.sidecarUrl', config.sidecarUrl)
+  }
+
+  function saveHarnessTestSelection(serverId: string, selectedTestIds: string[]): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'testing.selectedTests', selectedTestIds)
+  }
+
+  function getHarnessTestSelection(serverId: string): string[] {
+    const server = servers.value.find((entry) => entry.id === serverId)
+    return Array.isArray(server?.testing?.selectedTests)
+      ? server.testing.selectedTests
+      : []
+  }
+
+  function saveHarnessTestResults(serverId: string, run: HarnessRunResult): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'testing.results', run)
+  }
+
+  function getHarnessTestResults(serverId: string): HarnessRunResult | null {
+    const server = servers.value.find((entry) => entry.id === serverId)
+    return server?.testing?.results ?? null
+  }
+
+  function getActiveHarnessTestResults(): HarnessRunResult | null {
+    return activeServer.value?.testing?.results ?? null
+  }
+
 
   return {
     servers,
@@ -440,6 +481,12 @@ export const useServerStore = defineStore('server', () => {
     clearOAuthToken,
     saveTokenRevocation,
     setAuthStatus,
-    saveNodeInfo
+    saveNodeInfo,
+    saveHarnessConfig,
+    saveHarnessTestSelection,
+    saveHarnessTestResults,
+    getHarnessTestSelection,
+    getHarnessTestResults,
+    getActiveHarnessTestResults
   }
 })

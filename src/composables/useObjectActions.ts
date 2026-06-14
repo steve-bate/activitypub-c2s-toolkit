@@ -166,11 +166,11 @@ export function useObjectActions(options: UseObjectActionsOptions) {
       }
 
       const activity = type === 'Like'
-        ? createLikeActivity(activeActorId.value, objectUri.value)
-        : createAnnounceActivity(activeActorId.value, objectUri.value)
+        ? createLikeActivity(actorId, object)
+        : createAnnounceActivity(actorId, object)
 
       const exchange = await postActivityToOutbox({
-        outboxUrl: outboxUrl.value,
+        outboxUrl: outbox,
         activity,
         accessToken: token
       })
