@@ -21,7 +21,8 @@ function shouldIncludeBody(requestUrl: URL): boolean {
 }
 
 function omitBody(upstream: UpstreamResponsePayload): Omit<UpstreamResponsePayload, 'body'> {
-  const { body: _body, ...rest } = upstream
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
+  const { body, ...rest } = upstream
   return rest
 }
 
@@ -323,41 +324,55 @@ async function handleCorsDiagnostics(req: IncomingMessage, res: ServerResponse, 
   }
 }
 
-const server = createServer(async (req, res) => {
-  const requestUrl = new URL(req.url ?? '/', 'http://localhost')
+const server = createServer((req, res) => {
+  void (async () => {
+    const requestUrl = new URL(req.url ?? '/', 'http://localhost')
 
-  if (requestUrl.pathname === '/cors-diagnostics' && req.method === 'OPTIONS') {
-    handlePreflight(req, res, config)
-    return
-  }
+    if (requestUrl.pathname === '/cors-diagnostics' && req.method === 'OPTIONS') {
+      handlePreflight(req, res, config)
+      return
+    }
 
-  if (requestUrl.pathname === '/health' && req.method === 'GET') {
+    if (requestUrl.pathname === '/health' && req.method === 'GET') {
+      const corsResult = applyCorsHeaders(req, res, config)
+      if (!corsResult.allowed) {
+        writeJson(res, 403, { ok: false, error: toErrorPayload('ORIGIN_NOT_ALLOWED') })
+        return
+      }
+
+      writeJson(res, 200, { ok: true })
+      return
+    }
+
+    if (requestUrl.pathname === '/cors-diagnostics' && req.method === 'POST') {
+      await handleCorsDiagnostics(req, res, requestUrl)
+      return
+    }
+
     const corsResult = applyCorsHeaders(req, res, config)
     if (!corsResult.allowed) {
       writeJson(res, 403, { ok: false, error: toErrorPayload('ORIGIN_NOT_ALLOWED') })
       return
     }
 
-    writeJson(res, 200, { ok: true })
-    return
-  }
-
-  if (requestUrl.pathname === '/cors-diagnostics' && req.method === 'POST') {
-    await handleCorsDiagnostics(req, res, requestUrl)
-    return
-  }
-
-  const corsResult = applyCorsHeaders(req, res, config)
-  if (!corsResult.allowed) {
-    writeJson(res, 403, { ok: false, error: toErrorPayload('ORIGIN_NOT_ALLOWED') })
-    return
-  }
-
-  writeJson(res, 404, {
-    ok: false,
-    error: {
-      code: 'NOT_FOUND',
-      message: 'Route not found.'
+    writeJson(res, 404, {
+      ok: false,
+      error: {
+        code: 'NOT_FOUND',
+        message: 'Route not found.'
+      }
+    })
+  })().catch((error: unknown) => {
+    if (!res.headersSent) {
+      writeJson(res, 500, {
+        ok: false,
+        error: {
+          code: 'INTERNAL_ERROR',
+          message: error instanceof Error ? error.message : 'Internal server error.'
+        }
+      })
+    } else {
+      res.destroy(error instanceof Error ? error : undefined)
     }
   })
 })
