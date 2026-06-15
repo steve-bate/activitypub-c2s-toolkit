@@ -10,6 +10,8 @@ import FollowPage from '@/views/FollowPage.vue'
 import UploadMediaPage from '@/views/UploadMediaPage.vue'
 import SettingsPage from '@/views/SettingsPage.vue'
 import ObjectActionStatusPage from '@/views/ObjectActionStatusPage.vue'
+import ServerTestPage from '../views/ServerTestPage.vue'
+import ServerReportPage from '@/views/ServerReportPage.vue'
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
@@ -44,6 +46,11 @@ const router = createRouter({
       component: ServerOAuth2Page
     },
     {
+      path: '/servers/:id/report',
+      name: 'server-report',
+      component: ServerReportPage
+    },
+    {
       path: '/callback',
       name: 'oauth-callback',
       component: OAuthCallbackPage
@@ -73,6 +80,11 @@ const router = createRouter({
       path: '/object-action-status',
       name: 'object-action-status',
       component: ObjectActionStatusPage
+    },
+    {
+      path: '/tests',
+      name: 'testing',
+      component: ServerTestPage
     }
   ]
 })

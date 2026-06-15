@@ -10,6 +10,7 @@
     "sidecar:typecheck": "tsc -p tsconfig.sidecar.json --noEmit",
     "sidecar:build": "tsc -p tsconfig.sidecar.json",
     "sidecar:start": "node dist-sidecar/sidecar/server.js",
+    "test:unit": "vitest run",
     "lint": "npx eslint . && npx vue-tsc --strict --noEmit && check-unused-comp && npx knip",
     "lint:dups": "jscpd --min-tokens 75 --ignore '**/node_modules/**,**/dist/**,**/.vite/**' src/"
   },
@@ -35,9 +36,14 @@
     "postcss": "^8.4.0",
     "tailwindcss": "^3.4.0",
     "tsx": "^4.20.3",
-    "typescript": "^5.9.3",
+    "typescript": "^6.0.3",
     "typescript-eslint": "^8.55.0",
     "vite": "^5.0.0",
+    "vitest": "^4.1.7",
     "vue-tsc": "^3.2.4"
+  },
+  "allowScripts": {
+    "esbuild@0.21.5": true,
+    "esbuild@0.28.0": true
   }
 }
