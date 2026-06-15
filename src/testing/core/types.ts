@@ -12,13 +12,14 @@ export interface TestRunOptions {
   selectedTestIds?: string[]
   timeoutMs?: number
   blockedDependencyPolicy?: BlockedDependencyPolicy
+  // TODO use app-level option for sidecar
   sidecarUrl?: string
-  bearerTokenResolver?: () => string | undefined
   runParameters: {
     handle: string
     sidecarUrl?: string
     serverOrigin?: string
     authenticatedActorUri?: string
+    bearerToken?: string
   }
 }
 

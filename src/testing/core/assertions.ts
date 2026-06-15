@@ -133,8 +133,8 @@ function evaluateAssertion(
         assertion,
         passed,
         message: passed
-          ? `Path ${assertion.jsonPath} exists`
-          : `Path ${assertion.jsonPath} does not exist`,
+          ? `Path '${assertion.jsonPath}' exists`
+          : `Path '${assertion.jsonPath}' does not exist`,
       }
     }
 

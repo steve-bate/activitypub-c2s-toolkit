@@ -137,7 +137,7 @@ function printReport() {
             ActivityPub C2S Toolkit
           </p>
           <h1 class="text-3xl font-bold text-gray-900 dark:text-white print:text-black">
-            Server Compatibility Report
+            C2S Server Report
           </h1>
           <p class="mt-2 text-lg text-gray-600 dark:text-gray-300 print:text-gray-700">
             {{ server.origin ?? server.auth?.oauth2?.authServerOrigin }}
@@ -153,7 +153,7 @@ function printReport() {
           <!-- ── 1. Server Software ────────────────────────────────────────── -->
           <section>
             <h2 class="text-xl font-semibold text-gray-800 dark:text-white print:text-black mb-1">
-              1. Server Software
+              1. Server Software (NodeInfo)
             </h2>
             <hr class="border-gray-200 dark:border-gray-700 print:border-gray-300 mb-4" />
 

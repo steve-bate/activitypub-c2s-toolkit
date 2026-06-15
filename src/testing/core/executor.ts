@@ -65,7 +65,7 @@ export async function executeBrowserRequest(
     ...(request.headers ?? {}),
   }
 
-  let requestBody = request.body
+  const requestBody = request.body
 
   const requestExchange: HttpRequestData<string> = {
     url: request.url,

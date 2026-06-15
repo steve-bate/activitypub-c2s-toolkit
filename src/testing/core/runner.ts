@@ -93,7 +93,7 @@ function withBearerTokenIfAvailable(
   request: TestRequest,
   options: TestRunOptions,
 ): TestRequest {
-  const token = options.bearerTokenResolver?.()?.trim()
+  const token = options.runParameters.bearerToken
   if (!token || hasAuthorizationHeader(request.headers)) {
     return request
   }

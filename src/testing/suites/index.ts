@@ -1,6 +1,6 @@
 import type { TestSuiteDefinition } from "@/testing/core/types"
-import { actorResolutionAndCollectionsSuite } from "@/testing/suites/actorResolutionAndCollections"
+import { coreClientTests } from "@/testing/suites/coreClientTests"
 
 export const testSuites: TestSuiteDefinition[] = [
-  actorResolutionAndCollectionsSuite,
+  coreClientTests,
 ]
