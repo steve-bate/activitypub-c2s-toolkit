@@ -203,7 +203,7 @@ const displayedResults = computed(() => {
       resultsById.get(test.id) ?? {
         id: test.id,
         name: test.name,
-        status: 'skip' as TestStatus,
+        status: 'skip',
         reason: 'Not selected',
         startedAt: '',
         finishedAt: '',

@@ -1,0 +1,9 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "schema:as2/question",
+  "allOf": [
+    {"$ref": "schema:as2/intransitiveactivity-base"},
+    {"$ref": "schema:as2/question-base"}
+  ],
+  "title": "Question"
+}

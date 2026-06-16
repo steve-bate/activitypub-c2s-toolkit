@@ -1,0 +1,49 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "schema:as2/activity",
+  "$ref": "schema:as2/activity-base",
+  "title": "Activity",
+  "type": "object",
+  "properties": {
+    "type": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/types"
+        },
+        {
+          "type": "array",
+          "contains": {
+            "$ref": "#/$defs/types"
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "types": {
+      "enum": [
+        "Activity",
+        "Add",
+        "Announce",
+        "Create",
+        "Delete",
+        "Dislike",
+        "Flag",
+        "Follow",
+        "Join",
+        "Leave",
+        "Like",
+        "Listen",
+        "Move",
+        "Read",
+        "Remove",
+        "Undo",
+        "Update",
+        "View"
+      ]
+    }
+  },
+  "required": [
+    "type"
+  ]
+}

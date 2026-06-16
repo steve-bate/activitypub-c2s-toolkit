@@ -1,0 +1,16 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "schema:as2/extonly",
+  "type": "object",
+  "description": "It's valid to have an AS2 document with *only* extensions.",
+  "properties": {
+    "type": {
+      "type": "string",
+      "pattern": ".*:.*",
+      "description": "Hacky... but this is a strange use case."
+    }
+  },
+  "required": [
+    "type"
+  ]
+}
