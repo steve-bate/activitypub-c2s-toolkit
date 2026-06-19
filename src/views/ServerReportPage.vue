@@ -139,8 +139,11 @@ function printReport() {
           <h1 class="text-3xl font-bold text-gray-900 dark:text-white print:text-black">
             C2S Server Report
           </h1>
-          <p class="mt-2 text-lg text-gray-600 dark:text-gray-300 print:text-gray-700">
+          <p class="mt-2 text-lg text-gray-600 dark:text-gray-300 print:text-gray-700 text-sm">
             {{ server.origin ?? server.auth?.oauth2?.authServerOrigin }}
+          </p>
+          <p v-if="server.notes" class="mt-2 text-sm text-gray-600 dark:text-gray-400 print:text-gray-600">
+            {{ server.notes }} 
           </p>
           <p class="mt-4 text-sm text-gray-400 dark:text-gray-500 print:text-gray-500">
             Generated {{ reportDate }}

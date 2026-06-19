@@ -61,6 +61,7 @@ export interface ResourceServerMetadata {
   // TODO Remove
   name?: string
   identifier?: string
+  notes?: string
 
   auth?: AuthData
 
@@ -311,6 +312,15 @@ export const useServerStore = defineStore('server', () => {
     return true
   }
 
+  function saveServerNotes(serverId: string, notes: string): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'notes', notes)
+  }
+  
+  function getServerNotes(serverId: string): string | null {
+    const server = servers.value.find(s => s.id === serverId)
+    return server?.notes ?? null
+  }
+
   /**
    * Save RFC 8414 discovery metadata with method and response details
    */
@@ -487,6 +497,8 @@ export const useServerStore = defineStore('server', () => {
     saveTestResults,
     getTestSelection,
     getTestResults,
-    getActiveTestResults
+    getActiveTestResults,
+    saveServerNotes,
+    getServerNotes,
   }
 })
