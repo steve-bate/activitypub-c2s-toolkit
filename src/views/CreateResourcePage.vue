@@ -1,4 +1,5 @@
 <script setup lang="ts">
+// TODO Delete this page
 import { computed, ref, watch, onMounted } from 'vue'
 import { useServerStore } from '@/stores/serverStore'
 import { resolveHandle } from '@/services/webfingerService'

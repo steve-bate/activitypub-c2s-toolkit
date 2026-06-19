@@ -10,7 +10,7 @@ export type SplitEmptyMode = 'scalar' | 'array'
 
 export interface SplitTransformer {
   type: 'split'
-  delimiter?: SplitDelimiter | RegExp | string
+  delimiter?: SplitDelimiter | RegExp
   trim?: boolean
   removeEmpty?: boolean
   dedupe?: boolean
@@ -70,5 +70,6 @@ export interface ResourceTemplate {
 
 export type ValidationResult = {
   valid: boolean
-  errors: any
+  errors: unknown
+  jsonParseError?: boolean
 }

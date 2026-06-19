@@ -483,7 +483,7 @@ export async function rerunSingleTest(
   } else if (test.run) {
     outcome = await test.run(
       context,
-      buildTools(options, timeoutMs) as Parameters<typeof test.run>[1],
+      buildTools(options, timeoutMs),
     )
   } else {
     const preparation = asRequestPreparation(test, context)

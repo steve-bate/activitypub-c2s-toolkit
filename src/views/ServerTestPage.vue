@@ -13,6 +13,7 @@ import {
 import type { TestSuiteRunResult, TestCaseDefinition, TestStatus } from '@/testing/core/types'
 import type { ActorProfile } from '@/services/actorDiscoveryService'
 import StatusBadge from '@/testing/components/StatusBadge.vue'
+import { syntaxHighlightJson } from '@/utils/jsonHighlighter'
 
 const serverStore = useServerStore()
 
@@ -565,7 +566,8 @@ watch(() => serverStore.activeServerId, () => {
 
     <DisclosurePanel label="Test Context">
       <pre
-        class="text-xs bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-3 rounded overflow-auto">{{ JSON.stringify(displayedContext, null, 2) }}</pre>
+        class="text-xs bg-gray-100 dark:bg-gray-900 text-gray-800 dark:text-gray-100 p-3 rounded overflow-auto"
+          v-html="syntaxHighlightJson(JSON.stringify(displayedContext, null, 2))"/>
     </DisclosurePanel>
   </div>
 </template>

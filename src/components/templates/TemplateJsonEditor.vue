@@ -19,7 +19,8 @@
                 <label for="text-editor"
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Resource
                     Template</label>
-                <div class="bg-gray-50 dark:bg-gray-900 p-2 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200">
+                <div
+                    class="bg-gray-50 dark:bg-gray-900 p-2 focus-within:border-blue-500 focus-within:ring-2 focus-within:ring-blue-200">
                     <!-- equivalent to formkit inner -->
 
                     <textarea id="text-editor" rows="15"
@@ -40,13 +41,11 @@
         <div class="flex flex-row gap-4 mt-4">
             <button class="px-4 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400
         bg-blue-600 text-white hover:bg-blue-600
-        disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed"
-                @click="emit('save', saveTemplate)">Save</button>
+        disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed" @click="saveTemplate">Save</button>
 
             <button class="px-4 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400
         bg-blue-600 text-white hover:bg-blue-600
-        disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed"
-                @click="emit('apply', applyTemplate)">Apply</button>
+        disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed" @click="applyTemplate">Apply</button>
 
             <button class="px-4 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400
         bg-gray-600 text-white hover:bg-gray-600
@@ -54,9 +53,13 @@
                 @click="emit('cancel')">Cancel</button>
 
             <div class="ml-2">
-                <span v-if="validationResult" :class="validationResult.valid ? 'text-green-600' : 'text-red-600'"
-                    class="ml-2 text-lg">
-                    {{ validationResult.valid ? 'Valid ✅' : 'Invalid ❌' }}
+                <span v-if="validationResult" :class="validationResult.valid
+                    ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900/50 dark:bg-emerald-950/40 dark:text-emerald-300'
+                    : 'border-rose-200 bg-rose-50 text-rose-700 dark:border-rose-900/50 dark:bg-rose-950/40 dark:text-rose-300'"
+                    class="inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-sm font-medium shadow-sm">
+
+                    {{ validationResult.valid ? 'Valid' : 'Invalid' }}
+                    {{ validationResult.jsonParseError ? 'JSON' : 'AS2' }}
                 </span>
             </div>
 
@@ -137,6 +140,14 @@ const validationResult = ref<ValidationResult | null>(null)
 function runValidation() {
     try {
         const parsed = document.value
+        if (!parsed) {
+            validationResult.value = {
+                valid: false,
+                errors: [{ message: 'Invalid JSON' }],
+                jsonParseError: true
+            }
+            return
+        }
         const schemaId = 'schema:as2/activitystreams2'
         validationResult.value = validateBySchemaId(schemaId, parsed)
         if (!validationResult.value.valid) {
