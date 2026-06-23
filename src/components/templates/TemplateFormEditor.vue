@@ -4,14 +4,14 @@
             <div>
                 <label for="templateName"
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
-                <input id="templateName" required v-model="resourceTemplate.name" type="text"
+                <input id="templateName" required v-model="resourceTemplateName" type="text"
                     class="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" />
             </div>
 
             <div>
                 <label for="templateDescription"
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                <textarea id="templateDescription" v-model="resourceTemplate.description" rows="2" cols="60"
+                <textarea id="templateDescription" v-model="resourceTemplateDescription" rows="2" cols="60"
                     class="px-3 py-2 bg-gray-50 dark:bg-gray-900 text-xs font-mono text-gray-900 dark:text-gray-100 truncate"></textarea>
             </div>
         </DataPanel>        
@@ -35,7 +35,7 @@
             <!-- <AttachmentsEditor v-if="selectedTab === 'attachments'" class="flex-1" :schemas="ATTACHMENT_SCHEMAS"
                 @add="addAttachment" @update="attachmentUpdated" /> -->
 
-            <DisclosurePanel label="ActivityPub Document">
+            <DisclosurePanel label="ActivityPub Document Review">
                 <pre
                     class="flex-1 bg-gray-100 dark:bg-gray-800 p-4 rounded text-sm overflow-auto dark:text-gray-200">
 {{ document !== undefined ? JSON.stringify(document, null, 2) : '[Invalid JSON]' }}
@@ -75,8 +75,8 @@ import SchemaBasedEditor from '@/components/templates/SchemaBasedEditor.vue'
 import DisclosurePanel from '@/components/DisclosurePanel.vue'
 import DataPanel from '@/components/DataPanel.vue'
 import { ACTIVITY_SCHEMAS, OBJECT_SCHEMAS } from '@/lib/templates/schemas'
-import { EditorGroupNode, EditorSchema, EditorSchemaNode, JsonObject, JsonValue, ResourceTemplate, SplitTransformer, ValidationResult, ValueTransformer } from '@/lib/templates/types'
-import { validateBySchemaId } from "@/lib/validation/utils"
+import { EditorGroupNode, EditorSchema, EditorSchemaNode, JsonObject, JsonValue, ResourceTemplate, SplitTransformer, ValueTransformer } from '@/lib/templates/types'
+import { validateBySchemaId, ValidationResult } from "@/lib/validation/utils"
 import { computed, isReactive, isRef, onMounted, ref, toRaw, unref, watch } from 'vue'
 import Handlebars from 'handlebars';
 import { useServerStore } from '@/stores/serverStore';
@@ -84,13 +84,33 @@ import { useServerStore } from '@/stores/serverStore';
 const serverStore = useServerStore()
 
 const props = defineProps<{
-    resourceTemplate: ResourceTemplate,
+    modelValue: ResourceTemplate,
 }>()
+
+const resourceTemplateName = computed({
+  get: () => props.modelValue.name,
+  set: (name: string) => {
+    emit('update:modelValue', {
+      ...props.modelValue,
+      name,
+    })
+  },
+})
+
+const resourceTemplateDescription = computed({
+  get: () => props.modelValue.description,
+  set: (description: string) => {
+    emit('update:modelValue', {
+      ...props.modelValue,
+      description,
+    })
+  },
+})
 
 const selectedTab = ref('activity')
 
-const resourceTemplateData: Record<string, any> = computed(() => {
-    return props.resourceTemplate.template ? JSON.parse(props.resourceTemplate.template) : {}
+const resourceTemplateData = computed(() => {
+    return props.modelValue.template ? JSON.parse(props.modelValue.template) : {}
 })
 
 const objectOnly = ref(resourceTemplateData.value.objectOnly ?? false)
@@ -116,7 +136,7 @@ const selectedObjectSchemaName = ref(resourceTemplateData.value.objectSchema || 
 const objectSchemas = ref(OBJECT_SCHEMAS)
 
 const activeActivitySchema = computed(() => {
-    let schema = ACTIVITY_SCHEMAS.find((entry) => entry.name === selectedActivitySchemaName.value)
+    const schema = ACTIVITY_SCHEMAS.find((entry) => entry.name === selectedActivitySchemaName.value)
     if (!schema) {
         return undefined
     }
@@ -145,7 +165,7 @@ function hasExtraPropertiesNode(schema: EditorSchema): boolean {
 }
 
 const activeObjectSchema = computed(() => {
-    let schema = OBJECT_SCHEMAS.find((entry) => entry.name === selectedObjectSchemaName.value)
+    const schema = OBJECT_SCHEMAS.find((entry) => entry.name === selectedObjectSchemaName.value)
     // TODO Remove duplication
     if (!schema) {
         return undefined
@@ -368,33 +388,35 @@ const templateObject = computed(() => {
 })
 
 watch(templateObject, () => {
-    props.resourceTemplate.template = JSON.stringify(templateObject.value, null, 2)
+    emit('update:modelValue', {
+        ...props.modelValue,
+        template: JSON.stringify(templateObject.value, null, 2),
+    })
 }, { deep: true }
 )
 
-const validationResult = ref<ValidationResult | null>(null)
+const validationResult = ref<ValidationResult<JsonObject> | null>(null)
 
 function runValidation() {
     try {
         const parsed = document.value
         const schemaId = 'schema:as2/activitystreams2'
         validationResult.value = validateBySchemaId(schemaId, parsed)
-        if (!validationResult.value.valid) {
+        if (!validationResult.value?.valid) {
             console.debug(
                 'Validation errors:',
-                validationResult.value.errors?.map((x: any) => x.message).join('; ')
+                validationResult.value?.errors?.map((x) => x.message).join('; ')
             )
         }
-    } catch (err: any) {
+    } catch (err: unknown) {
         validationResult.value = {
             valid: false,
-            errors: [{ message: err.message }]
+            errors: [err instanceof Error ? err : new Error(String(err))]
         }
-        console.log('Validation error', validationResult.value.errors[0]?.message)
     }
 }
 
-const emit = defineEmits(['save', "apply", "cancel"])
+const emit = defineEmits(['save', "apply", "cancel", "update:modelValue"])
 
 //
 // Preview
@@ -448,15 +470,13 @@ watch(document, () => {
 }, { deep: true })
 
 function applyTemplate() {
-    props.resourceTemplate.document = document.value
-    console.log("Applying template:", props.resourceTemplate)
-    emit('apply', props.resourceTemplate)
+    console.log("Applying template:", props.modelValue)
+    emit('apply', props.modelValue)
 }
 
 function saveTemplate() {
-    props.resourceTemplate.document = document.value
-    console.log("Saving template:", props.resourceTemplate)
-    emit('save', props.resourceTemplate)
+    console.log("Saving template:", props.modelValue)
+    emit('save', props.modelValue)
 }
 </script>
 

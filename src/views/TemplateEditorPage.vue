@@ -17,14 +17,14 @@
     </DataPanel> -->
 
     <TemplateFormEditor v-if="resourceTemplate.editorType === 'form'" 
-      :resourceTemplate="resourceTemplate"
+      v-model="resourceTemplate"
       @save="saveTemplate"
       @apply="applyTemplate"
       @cancel="cancelEdit" 
     />
 
     <TemplateJsonEditor v-else-if="resourceTemplate.editorType === 'json'"
-      :resourceTemplate="resourceTemplate"
+      v-model="resourceTemplate"
       @save="saveTemplate"
       @apply="applyTemplate"
       @cancel="cancelEdit" 
@@ -35,7 +35,6 @@
 <script setup lang='ts'>
 import { ref, onMounted, watch, toRaw, computed } from 'vue';
 import { useRoute } from 'vue-router'
-import DataPanel from '@/components/DataPanel.vue'
 import TemplateJsonEditor from '@/components/templates/TemplateJsonEditor.vue'
 import TemplateFormEditor from '@/components/templates/TemplateFormEditor.vue'
 import { ResourceTemplate } from '@/lib/templates/types';

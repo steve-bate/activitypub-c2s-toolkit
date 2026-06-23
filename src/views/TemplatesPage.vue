@@ -77,14 +77,14 @@ function addTemplate(selectedEditorType: "form" | "json") {
     })
 }
 
-function editTemplate(row: any) {
+function editTemplate(row: ResourceTemplate) {
   router.push({
     name: 'resourceTemplateEdit',
     params: { id: String(row.id) },
   })
 }
 
-function duplicateTemplate(row: any) {
+function duplicateTemplate(row: ResourceTemplate) {
   console.log('Duplicating resource template:', row)
   let newName = row.name
   const match = newName.match(/\((\d+)\)$/)
@@ -98,9 +98,9 @@ function duplicateTemplate(row: any) {
   resourceTemplateStore.add(newTemplate)
 }
 
-function deleteTemplate(row: any) {
+function deleteTemplate(row: ResourceTemplate) {
   console.log('Deleting resource template:', row)
-  resourceTemplateStore.remove(row.id)
+  resourceTemplateStore.remove(row.id!)
 }
 
 //
@@ -149,7 +149,8 @@ async function postToOutbox(outboxUrl: string, document: JsonObject) {
 
     const controller = new AbortController()
     const timeoutMs = 10000 // 10 seconds
-    // @ts-ignore ref needed to prevent GC
+    // @ts-expect-error ref needed to prevent GC
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const timeoutHandle = window.setTimeout(() => controller.abort(), timeoutMs)
 
     const token = serverStore.activeServer?.auth?.bearerToken
@@ -244,8 +245,8 @@ async function postTemplate(resourceTemplate: ResourceTemplate) {
       errorMessage.value = postResult.value.exchange.error || 'An unknown error occurred during posting.'
     }
   }
-  catch (error: any) {
-    errorMessage.value = error.message || 'An unknown error occurred during posting.'
+  catch (error: unknown) {
+    errorMessage.value = error instanceof Error ? error.message : 'An unknown error occurred during posting.'
   }
 }
 </script>

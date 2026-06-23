@@ -1,3 +1,5 @@
+import { ValidationResult } from "../validation/utils"
+
 export type JsonPrimitive = string | number | boolean | null
 export type JsonValue = JsonPrimitive | JsonObject | JsonArray
 export type JsonObject = { [key: string]: JsonValue }
@@ -68,8 +70,17 @@ export interface ResourceTemplate {
   [key: string]: unknown
 }
 
-export type ValidationResult = {
+export type TemplateValidationResult = {
   valid: boolean
-  errors: unknown
+  errors: Error[]
   jsonParseError?: boolean
+  schemaValidation?: ValidationResult<JsonObject>
+}
+
+export class JsonParseError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "JsonParseError";
+    Object.setPrototypeOf(this, new.target.prototype);
+  }
 }

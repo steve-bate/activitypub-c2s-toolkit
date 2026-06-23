@@ -1,10 +1,11 @@
-<script setup>
+<script setup lang="ts">
 import { ref } from 'vue'
 import { truncateString } from '@/utils'
+import { ResourceTemplate } from '@/lib/templates/types'
 
 const props = defineProps({
     items: {
-        type: Array,
+        type: Array as () => Array<ResourceTemplate>,
         required: true
     },
 })
@@ -102,7 +103,7 @@ const css = {
                 <span>Add</span>
             </button>
 
-            <label for="editorType" class="block text-gray-200 pt-2">Editor Type:</label>
+            <label for="editorType" class="block text-gray-200 pt-2 ml-3">Editor Type:</label>
             <select id="editorType" class="px-3 py-2 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 bg-blue-800 text-white" v-model="editorType">
                 <option value="form">Form</option>
                 <option value="json">JSON</option>

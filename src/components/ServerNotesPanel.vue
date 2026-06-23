@@ -1,15 +1,30 @@
 <script setup lang="ts">
 import { useServerStore, type ResourceServerMetadata } from '@/stores/serverStore'
 import DataPanel from '@/components/DataPanel.vue'
+import { computed } from 'vue';
 
 const props = defineProps<{
-  server: ResourceServerMetadata
+  modelValue: ResourceServerMetadata
 }>()
 
+const emit = defineEmits<{
+  (e: 'update:modelValue', value: ResourceServerMetadata): void
+}>()
+
+const serverNotes = computed({
+  get: () => props.modelValue.notes,
+  set: (notes: string) => {
+    emit('update:modelValue', {
+      ...props.modelValue,
+      notes,
+    })
+  },
+})
+
 function saveNotes() {
-  if (props.server) {
+  if (props.modelValue) {
     const serverStore = useServerStore()
-    serverStore.saveServerNotes(props.server.id, props.server.notes ?? '')
+    serverStore.saveServerNotes(props.modelValue.id, props.modelValue.notes ?? '')
   }
 }
 </script>
@@ -21,7 +36,7 @@ function saveNotes() {
     </template>
 
     <div class="space-y-4">
-      <textarea id="templateDescription" v-model="server.notes" rows="5" cols="60"
+      <textarea id="templateDescription" v-model="serverNotes" rows="5" cols="60"
                     class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 text-xs font-mono 
                     text-gray-900 dark:text-gray-100 truncate"
                     placeholder="Enter notes here..."

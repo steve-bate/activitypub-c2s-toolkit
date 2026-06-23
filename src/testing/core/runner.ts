@@ -5,7 +5,6 @@ import {
 } from "@/testing/core/assertions"
 import { buildDependencyPlan } from "@/testing/core/dependencyGraph"
 import {
-  executeBrowserRequest,
   runSidecarDiagnostics,
   shouldAttemptSidecarDiagnostics,
 } from "@/testing/core/executor"
@@ -19,7 +18,9 @@ import type {
   TestRequest,
   TestRunOptions,
   TestStatus,
+  TestCaseResult,
 } from "@/testing/core/types"
+import { xfetch } from "@/utils/httpExchange"
 
 const TEST_SCHEMA_VERSION = 1
 
@@ -205,28 +206,38 @@ export async function runTestSuite(
       outcome = await test.run(context, {
         executeRequest: async (request, assertions = []) => {
           const authedRequest = withBearerTokenIfAvailable(request, options)
-          const attempt = await executeBrowserRequest(authedRequest, timeoutMs)
-          const assertionOutcomes = evaluateAssertions(assertions, attempt)
+          const exchange = await xfetch(authedRequest.url, {
+            method: authedRequest.method,
+            headers: authedRequest.headers,
+            body: authedRequest.body,
+            timeout: timeoutMs,
+          })
+          const assertionOutcomes = evaluateAssertions(assertions, exchange)
 
           let diagnostics = undefined
-          if (shouldAttemptSidecarDiagnostics(attempt)) {
+          if (shouldAttemptSidecarDiagnostics(exchange)) {
             diagnostics = await runSidecarDiagnostics(
               options.sidecarUrl,
               authedRequest,
-              attempt,
               timeoutMs,
             )
           }
 
           if (
-            !attempt.exchange.success &&
+            !exchange.success &&
             assertions.length === 0 &&
-            attempt.transportError
+            exchange.errorKind
           ) {
             return {
               status: "fail",
-              reason: `Browser request failed: ${attempt.transportError.message}`,
-              attempt,
+              reason: `Browser request failed: ${exchange.error}`,
+              attempt: {
+                startedAt: nowIso(),
+                finishedAt: nowIso(),
+                durationMs: 0,
+                exchange,
+                transportError: exchange.errorKind === "transport" ? { kind: "transport", message: exchange.error ?? "" } : undefined,
+              },
               assertions: assertionOutcomes,
               diagnostics,
             }
@@ -234,7 +245,7 @@ export async function runTestSuite(
 
           const status: TestStatus = allAssertionsPassed(assertionOutcomes)
             ? "pass"
-            : attempt.transportError
+            : exchange.errorKind
               ? "error"
               : "fail"
 
@@ -242,7 +253,7 @@ export async function runTestSuite(
             status,
             reason:
               status === "pass" ? undefined : "One or more assertions failed",
-            attempt,
+            exchange,
             assertions: assertionOutcomes,
             diagnostics,
           }
@@ -282,18 +293,20 @@ export async function runTestSuite(
           preparation.request,
           options,
         )
-        const attempt = await executeBrowserRequest(authedRequest, timeoutMs)
+        const exchange = await xfetch(
+          authedRequest.url,
+          authedRequest,
+        )
         const assertionOutcomes = evaluateAssertions(
           test.assertions ?? [],
-          attempt,
+          exchange,
         )
 
         let diagnostics = undefined
-        if (shouldAttemptSidecarDiagnostics(attempt)) {
+        if (shouldAttemptSidecarDiagnostics(exchange)) {
           diagnostics = await runSidecarDiagnostics(
             options.sidecarUrl,
             authedRequest,
-            attempt,
             timeoutMs,
           )
         }
@@ -302,10 +315,10 @@ export async function runTestSuite(
           assertionOutcomes.length > 0
             ? allAssertionsPassed(assertionOutcomes)
               ? "pass"
-              : attempt.transportError
+              : exchange.errorKind
                 ? "error"
                 : "fail"
-            : attempt.exchange.success
+            : exchange.success
               ? "pass"
               : "fail"
 
@@ -314,9 +327,9 @@ export async function runTestSuite(
           reason:
             status === "pass"
               ? undefined
-              : (attempt.exchange.error ?? "Request failed"),
+              : (exchange.error ?? "Request failed"),
           assertions: assertionOutcomes,
-          attempt,
+          exchange,
           diagnostics,
         }
       }
@@ -325,7 +338,7 @@ export async function runTestSuite(
     const executionFinishedAt = nowIso()
     const durationMs = Math.round(performance.now() - executionStartTime)
 
-    const result = {
+    const result: TestCaseResult = {
       id: test.id,
       name: test.name,
       status: outcome.status,
@@ -335,7 +348,7 @@ export async function runTestSuite(
       durationMs,
       dependsOn: [...(test.dependsOn ?? [])],
       assertions: outcome.assertions,
-      attempt: outcome.attempt,
+      exchange: outcome.exchange,
       diagnostics: outcome.diagnostics,
       contextUpdates: outcome.contextUpdates,
     }
@@ -381,28 +394,27 @@ function buildTools(options: TestRunOptions, timeoutMs: number) {
       assertions: TestAssertion[] = [],
     ) => {
       const authedRequest = withBearerTokenIfAvailable(request, options)
-      const attempt = await executeBrowserRequest(authedRequest, timeoutMs)
-      const assertionOutcomes = evaluateAssertions(assertions, attempt)
+      const exchange = await xfetch(authedRequest.url, authedRequest)
+      const assertionOutcomes = evaluateAssertions(assertions, exchange)
 
       let diagnostics = undefined
-      if (shouldAttemptSidecarDiagnostics(attempt)) {
+      if (shouldAttemptSidecarDiagnostics(exchange)) {
         diagnostics = await runSidecarDiagnostics(
           options.sidecarUrl,
           authedRequest,
-          attempt,
           timeoutMs,
         )
       }
 
       if (
-        !attempt.exchange.success &&
+        !exchange.success &&
         assertions.length === 0 &&
-        attempt.transportError
+        exchange.errorKind
       ) {
         return {
           status: "fail" as TestStatus,
-          reason: `Browser request failed: ${attempt.transportError.message}`,
-          attempt,
+          reason: `Browser request failed: ${exchange.error}`,
+          attempt: exchange,
           assertions: assertionOutcomes,
           diagnostics,
         }
@@ -410,15 +422,16 @@ function buildTools(options: TestRunOptions, timeoutMs: number) {
 
       const status: TestStatus = allAssertionsPassed(assertionOutcomes)
         ? "pass"
-        : attempt.transportError
+        : exchange.errorKind
           ? "error"
           : "fail"
 
       return {
         status,
         reason: status === "pass" ? undefined : "One or more assertions failed",
-        attempt,
+        attempt: exchange,
         assertions: assertionOutcomes,
+        exchange,
         diagnostics,
       }
     },
@@ -504,18 +517,17 @@ export async function rerunSingleTest(
         preparation.request,
         options,
       )
-      const attempt = await executeBrowserRequest(authedRequest, timeoutMs)
+      const exchange = await xfetch(authedRequest.url, authedRequest)
       const assertionOutcomes = evaluateAssertions(
         test.assertions ?? [],
-        attempt,
+        exchange,
       )
 
       let diagnostics = undefined
-      if (shouldAttemptSidecarDiagnostics(attempt)) {
+      if (shouldAttemptSidecarDiagnostics(exchange)) {
         diagnostics = await runSidecarDiagnostics(
           options.sidecarUrl,
           authedRequest,
-          attempt,
           timeoutMs,
         )
       }
@@ -524,10 +536,10 @@ export async function rerunSingleTest(
         assertionOutcomes.length > 0
           ? allAssertionsPassed(assertionOutcomes)
             ? "pass"
-            : attempt.transportError
+            : exchange.errorKind
               ? "error"
               : "fail"
-          : attempt.exchange.success
+          : exchange.success
             ? "pass"
             : "fail"
 
@@ -536,9 +548,8 @@ export async function rerunSingleTest(
         reason:
           status === "pass"
             ? undefined
-            : (attempt.exchange.error ?? "Request failed"),
+            : (exchange.error ?? "Request failed"),
         assertions: assertionOutcomes,
-        attempt,
         diagnostics,
       }
     }
@@ -554,7 +565,7 @@ export async function rerunSingleTest(
     durationMs: Math.round(performance.now() - startTime),
     dependsOn: [...(test.dependsOn ?? [])],
     assertions: outcome.assertions,
-    attempt: outcome.attempt,
+    exchange: outcome.exchange,
     diagnostics: outcome.diagnostics,
     contextUpdates: outcome.contextUpdates,
   }

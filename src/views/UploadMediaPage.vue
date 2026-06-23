@@ -197,7 +197,7 @@ async function handleSubmit() {
       accessToken: token
     })
 
-    exchange.value = uploadExchange as unknown as HttpExchange<HttpRequestData, HttpResponseData>
+    exchange.value = uploadExchange
 
     if (!uploadExchange.success) {
       errorMessage.value = uploadExchange.error || 'Media upload failed.'

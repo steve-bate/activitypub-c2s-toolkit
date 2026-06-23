@@ -19,7 +19,7 @@ export function useCorsDiagnostics() {
 
   async function getCorsDiagnostics(
     input: CorsDiagnosticRequest,
-  ): Promise<CorsDiagnosticResult | null> {
+  ): Promise<CorsDiagnosticResult | undefined> {
     controller?.abort();
     controller = new AbortController();
 
@@ -28,11 +28,11 @@ export function useCorsDiagnostics() {
 
     try {
       const result = await runCorsDiagnostics(input, controller.signal);
-      diagnosticsResult.value = result;
+      diagnosticsResult.value = result ?? null;
       return result;
     } catch (err) {
       if ((err as Error).name === "AbortError") {
-        return null;
+        return undefined;
       }
       error.value = err as Error;
       throw err;
@@ -51,8 +51,13 @@ export function useCorsDiagnostics() {
       if (!corsDiagnosticUrl) {
           return false;
       }
-      const response = await fetch(corsDiagnosticUrl + "/health", { method: "GET" });
-      return response.ok;
+      try {
+        const response = await fetch(corsDiagnosticUrl + "/health", { method: "GET" });
+        return response.ok;
+      } catch (err) {
+        console.log("Error checking CORS diagnostics health:", err);
+        return false;
+      }
   }
 
   return {

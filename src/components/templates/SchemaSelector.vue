@@ -24,14 +24,14 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 defineProps({
   modelValue: {
     type: String,
     default: '',
   },
   options: {
-    type: Array,
+    type: Array as () => { name: string }[],
     default: () => [],
   },
   selectId: {
@@ -42,7 +42,7 @@ defineProps({
 
 const emit = defineEmits(['update:modelValue'])
 
-function onChange(event) {
-  emit('update:modelValue', event.target.value)
+function onChange(event: Event) {
+  emit('update:modelValue', (event.target as HTMLSelectElement).value)
 }
 </script>

@@ -23,7 +23,7 @@ const displayName = computed(() =>
 </script>
 
 <template>
-  <span class="text-xs px-2 py-1 rounded border":class="statusClass(props.status)">
+  <span class="text-xs px-2 py-1 rounded border" :class="statusClass(props.status)">
     {{ displayName }}
   </span>
 </template>

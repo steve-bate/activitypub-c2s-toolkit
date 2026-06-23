@@ -155,7 +155,7 @@ const tests: TestCaseDefinition[] = [
 
       // TODO check JRD against JSON Schema
 
-      const indexDoc = await indexOutcome.attempt?.responseJson as NodeInfoIndex
+      const indexDoc = await indexOutcome.exchange?.response?.payload as NodeInfoIndex
       console.log(`NodeInfo index response`, indexDoc)
 
       const metadataUrl = indexDoc.links?.find((link: { rel: string; href: string }) => link.rel.startsWith('http://nodeinfo.diaspora.software/ns/schema/'))?.href
@@ -165,7 +165,7 @@ const tests: TestCaseDefinition[] = [
       }
 
       // TODO check metadata against JSON Schema
-      const requiredPropertyAssertions = [
+      const requiredPropertyAssertions: TestAssertion[] = [
         "version",
         "software",
         "protocols",
@@ -179,7 +179,7 @@ const tests: TestCaseDefinition[] = [
             kind: "jsonPathExists",
             label: `NodeInfo path '${path}' exists`,
             jsonPath: path,
-          }) as TestAssertion,
+          }),
       );
 
       const outcome = await tools.executeRequest(
@@ -196,13 +196,13 @@ const tests: TestCaseDefinition[] = [
 
       console.log(`NodeInfo request outcome`, outcome)
 
-      if (!outcome.attempt?.responseJson || outcome.status !== "pass") {
+      if (!outcome.exchange?.response?.payload || outcome.status !== "pass") {
         return outcome
       }
 
       return {
         ...outcome,
-        contextUpdates: { nodeInfoData: outcome.attempt.responseJson },
+        contextUpdates: { nodeInfoData: outcome.exchange?.response?.payload },
       }
     },
   },
@@ -223,11 +223,11 @@ const tests: TestCaseDefinition[] = [
         ACTOR_ASSERTIONS,
       )
 
-      if (!outcome.attempt?.responseJson || outcome.status !== "pass") {
+      if (!outcome.exchange?.response?.payload || outcome.status !== "pass") {
         return outcome
       }
 
-      const payload = outcome.attempt.responseJson as Record<string, unknown>
+      const payload = outcome.exchange?.response?.payload as Record<string, unknown>
       const inboxUri =
         typeof payload.inbox === "string" ? payload.inbox : undefined
       const outboxUri =
@@ -258,14 +258,14 @@ const tests: TestCaseDefinition[] = [
         { url: inboxUri },
         COLLECTION_ASSERTIONS,
       )
-      if (!outcome.attempt?.responseJson || outcome.status !== "pass") {
+      if (!outcome.exchange?.response?.payload || outcome.status !== "pass") {
         return outcome
       }
 
       return {
         ...outcome,
         contextUpdates: {
-          inboxCollection: outcome.attempt.responseJson,
+          inboxCollection: outcome.exchange?.response?.payload,
         },
       }
     },
@@ -286,7 +286,7 @@ const tests: TestCaseDefinition[] = [
           { url },
           COLLECTION_ASSERTIONS,
         )
-        return outcome.attempt?.responseJson
+        return outcome.exchange?.response?.payload
       }
 
       const [inboxItemUri] = await getCollectionItemUris(
@@ -326,14 +326,14 @@ const tests: TestCaseDefinition[] = [
         { url: outboxUri },
         COLLECTION_ASSERTIONS,
       )
-      if (!outcome.attempt?.responseJson || outcome.status !== "pass") {
+      if (!outcome.exchange?.response?.payload || outcome.status !== "pass") {
         return outcome
       }
 
       return {
         ...outcome,
         contextUpdates: {
-          outboxCollection: outcome.attempt.responseJson,
+          outboxCollection: outcome.exchange?.response?.payload,
         },
       }
     },
@@ -354,7 +354,7 @@ const tests: TestCaseDefinition[] = [
           { url },
           COLLECTION_ASSERTIONS,
         )
-        return outcome.attempt?.responseJson
+        return outcome.exchange?.response?.payload
       }
 
       const [outboxItemUri] = await getCollectionItemUris(
@@ -422,7 +422,7 @@ const tests: TestCaseDefinition[] = [
         ],
       )
 
-      const postedActivityUri = outcome.attempt?.exchange?.response?.headers?.location
+      const postedActivityUri = outcome.exchange?.response?.headers?.location
       if (!postedActivityUri) {
         outcome.status = "fail"
         outcome.reason = "Outbox response did not include Location header for posted activity"
@@ -438,7 +438,7 @@ const tests: TestCaseDefinition[] = [
         return outcome
       }
 
-      if (!outcome.attempt?.responseJson || outcome.status !== "pass") {
+      if (!outcome.exchange?.response?.payload || outcome.status !== "pass") {
         return outcome
       }
 
@@ -495,7 +495,7 @@ const tests: TestCaseDefinition[] = [
         ],
       )
 
-      const postedObjectUri = outcome.attempt?.exchange?.response?.headers?.location
+      const postedObjectUri = outcome.exchange?.response?.headers?.location
       if (!postedObjectUri) {
         outcome.status = "fail"
         outcome.reason = "Outbox response did not include Location header for posted object"
@@ -511,7 +511,7 @@ const tests: TestCaseDefinition[] = [
         return outcome
       }
 
-      if (!outcome.attempt?.responseJson || outcome.status !== "pass") {
+      if (!outcome.exchange?.response?.payload || outcome.status !== "pass") {
         return outcome
       }
 
@@ -529,7 +529,7 @@ const tests: TestCaseDefinition[] = [
 
 export const coreClientTests: TestSuiteDefinition = {
   id: "core-client-tests",
-  name: "Core Client Tests",
+  name: "Core Server Tests",
   description:
     "Core/basic C2S test cases and related functionality like WebFinger and NodeInfo",
   tests,

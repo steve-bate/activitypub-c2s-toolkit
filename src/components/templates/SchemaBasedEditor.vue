@@ -22,9 +22,10 @@
   </div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { computed } from 'vue'
 import SchemaSelector from './SchemaSelector.vue'
+import type { EditorSchema } from "@/lib/templates/types.ts";
 
 const props = defineProps({
   selectedSchemaName: {
@@ -32,7 +33,7 @@ const props = defineProps({
     default: '',
   },
   schemas: {
-    type: Array,
+    type: Array as () => EditorSchema[],
     default: () => [],
   },
 
@@ -62,8 +63,12 @@ const selectedSchemaModel = computed({
 })
 
 const schema = computed(() => {
-  return props.schemas.find(
-    (schema) => schema.name === props.selectedSchemaName,
+  const s = props.schemas.find(
+    (s) => s.name === props.selectedSchemaName,
   )
+  if (!s) {
+    throw new Error(`Unknown schema: ${props.selectedSchemaName}`)
+  }
+  return s
 })
 </script>

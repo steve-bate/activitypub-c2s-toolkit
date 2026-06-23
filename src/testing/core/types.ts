@@ -54,30 +54,13 @@ export interface AssertionOutcome {
   message: string
 }
 
-export type BrowserErrorKind = "transport" | "timeout" | "opaque" | "unknown"
-
-export interface BrowserTransportError {
-  kind: BrowserErrorKind
-  message: string
-}
-
-export interface BrowserAttemptResult {
-  startedAt: string
-  finishedAt: string
-  durationMs: number
-  exchange: HttpExchange<HttpRequestData<string>, HttpResponseData<unknown>>
-  responseText?: string
-  responseJson?: unknown
-  transportError?: BrowserTransportError
-}
-
 export type CorsDiagnosticConfidence = "definite" | "probable" | "unknown"
 
 export interface SidecarDiagnostics {
   attempted: boolean
   available: boolean
   diagnosticsUnavailableReason?: string
-  confidence: CorsDiagnosticConfidence
+  confidence?: CorsDiagnosticConfidence
   summary: string
   sidecarExchange?: HttpExchange<
     HttpRequestData<string>,
@@ -95,7 +78,7 @@ export interface TestCaseResult {
   durationMs: number
   dependsOn: string[]
   assertions: AssertionOutcome[]
-  attempt?: BrowserAttemptResult
+  exchange?: HttpExchange<HttpRequestData<unknown>, HttpResponseData<unknown>>
   diagnostics?: SidecarDiagnostics
   contextUpdates?: Record<string, unknown>
 }
@@ -191,7 +174,7 @@ export interface TestCaseExecutionOutcome {
   status: TestStatus
   reason?: string
   assertions: AssertionOutcome[]
-  attempt?: BrowserAttemptResult
+  exchange?: HttpExchange<HttpRequestData<unknown>, HttpResponseData<unknown>>
   diagnostics?: SidecarDiagnostics
   contextUpdates?: Record<string, unknown>
 }

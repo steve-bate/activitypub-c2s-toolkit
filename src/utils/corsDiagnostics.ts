@@ -77,13 +77,13 @@ export async function getCorsDiagnostics(
   request: CorsDiagnosticRequest,
   signal?: AbortSignal,
   corsDiagnosticUrl?: string,
-): Promise<CorsDiagnosticResult | null> {
+): Promise<CorsDiagnosticResult | undefined> {
   if (!corsDiagnosticUrl) {
     const settingsStore = useSettingsStore();
     corsDiagnosticUrl = settingsStore.settings.corsDiagnosticsUrl;
   }
 
-  if (!corsDiagnosticUrl) return null;
+  if (!corsDiagnosticUrl) return undefined;
 
   corsDiagnosticUrl = corsDiagnosticUrl.replace(/\/+$/, "") + "/diagnostics";
 

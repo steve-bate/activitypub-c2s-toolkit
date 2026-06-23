@@ -1,8 +1,8 @@
 import type {
   AssertionOutcome,
-  BrowserAttemptResult,
   TestAssertion,
 } from "@/testing/core/types"
+import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
 
 interface PathPart {
   kind: "property" | "index"
@@ -73,11 +73,11 @@ function hasActivityPubContext(payload: unknown): boolean {
 
 function evaluateAssertion(
   assertion: TestAssertion,
-  attempt: BrowserAttemptResult,
+  exchange: HttpExchange<HttpRequestData<unknown>, HttpResponseData<unknown>>,
 ): AssertionOutcome {
-  const response = attempt.exchange.response
+  const response = exchange.response
   const responseHeaders = response?.headers ?? {}
-  const payload = attempt.responseJson
+  const payload = exchange.response?.payload
 
   switch (assertion.kind) {
     case "status": {
@@ -192,9 +192,9 @@ function evaluateAssertion(
 
 export function evaluateAssertions(
   assertions: TestAssertion[],
-  attempt: BrowserAttemptResult,
+  exchange: HttpExchange<HttpRequestData<unknown>, HttpResponseData<unknown>>,
 ): AssertionOutcome[] {
-  return assertions.map((assertion) => evaluateAssertion(assertion, attempt))
+  return assertions.map((assertion) => evaluateAssertion(assertion, exchange))
 }
 
 export function allAssertionsPassed(assertions: AssertionOutcome[]): boolean {

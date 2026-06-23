@@ -3,8 +3,8 @@ import { ajv } from "@/lib/validation/ajv"
 
 export interface ValidationResult<T = unknown> {
   valid: boolean
-  data: T
-  errors: ErrorObject[] | null | undefined
+  errors: ErrorObject[] | Error[] | null | undefined
+  data?: T
 }
 
 export function validateBySchemaId<T = unknown>(

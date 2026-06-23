@@ -4,14 +4,14 @@
             <div>
                 <label for="templateName"
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Name</label>
-                <input id="templateName" required v-model="resourceTemplate.name" type="text"
+                <input id="templateName" required v-model="resourceTemplateName" type="text"
                     class="px-3 py-2 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded text-xs font-mono text-gray-900 dark:text-gray-100 truncate" />
             </div>
 
             <div>
                 <label for="templateDescription"
                     class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Description</label>
-                <textarea id="templateDescription" v-model="resourceTemplate.description" rows="2" cols="60"
+                <textarea id="templateDescription" v-model="resourceTemplateDescription" rows="2" cols="60"
                     class="px-3 py-2 bg-gray-50 dark:bg-gray-900 text-xs font-mono text-gray-900 dark:text-gray-100 truncate"></textarea>
             </div>
 
@@ -25,12 +25,12 @@
 
                     <textarea id="text-editor" rows="15"
                         class="w-full px-3 py-2 bg-gray-50 dark:bg-gray-900 font-mono text-sm text-gray-900 dark:text-gray-100 truncate focus:outline-none"
-                        v-model="props.resourceTemplate.template"></textarea>
+                        v-model="resourceModelTemplate"></textarea>
                 </div>
             </div>
         </DataPanel>
 
-        <DisclosurePanel label="ActivityPub Document" class="mt-2">
+        <DisclosurePanel label="ActivityPub Document Review" class="mt-2">
             <pre id="preview"
                 class="flex-1 bg-gray-100 dark:bg-gray-800 p-4 rounded text-sm overflow-auto dark:text-gray-200">
 {{ document !== undefined ? JSON.stringify(document, null, 2) : '[Invalid JSON]' }}
@@ -69,7 +69,7 @@
 
 <script setup lang='ts'>
 import { computed, ref, toRaw, watch } from 'vue';
-import { ResourceTemplate, ValidationResult } from '@/lib/templates/types';
+import { JsonParseError, ResourceTemplate, TemplateValidationResult } from '@/lib/templates/types';
 import { validateBySchemaId } from '@/lib/validation/utils';
 import { useServerStore } from '@/stores/serverStore';
 import Handlebars from 'handlebars';
@@ -79,10 +79,40 @@ import DataPanel from '@/components/DataPanel.vue'
 const serverStore = useServerStore()
 
 const props = defineProps<{
-    resourceTemplate: ResourceTemplate
+    modelValue: ResourceTemplate
 }>()
 
-const emit = defineEmits(['save', 'apply', 'cancel'])
+const emit = defineEmits(['save', 'apply', 'cancel', "update:modelValue"])
+
+const resourceTemplateName = computed({
+  get: () => props.modelValue.name,
+  set: (name: string) => {
+    emit('update:modelValue', {
+      ...props.modelValue,
+      name,
+    })
+  },
+})
+
+const resourceTemplateDescription = computed({
+  get: () => props.modelValue.description,
+  set: (description: string) => {
+    emit('update:modelValue', {
+      ...props.modelValue,
+      description,
+    })
+  },
+})
+
+const resourceModelTemplate = computed({
+  get: () => props.modelValue.template,
+  set: (template: string) => {
+    emit('update:modelValue', {
+      ...props.modelValue,
+      template,
+    })
+  },
+})
 
 Handlebars.registerHelper('uuid', function () {
     return crypto.randomUUID();
@@ -107,12 +137,12 @@ Handlebars.registerHelper("baseurl", function (url) {
     return new URL(url, serverStore.activeServer?.actor?.profile.id).origin;
 })
 
-const templateContext = ref<Record<string, any>>({
+const templateContext = ref<Record<string, unknown>>({
     actor: serverStore.activeServer?.actor?.profile,
     "timestamp": new Date().toISOString(),
 });
 
-watch(() => props.resourceTemplate.template, async (templateText) => {
+watch(() => props.modelValue.template, async (templateText) => {
     if (templateText.includes("randomPost") && !templateContext.value.randomPost) {
         console.log("Fetching random post for template context...");
         templateContext.value.randomPost = await fetchRandomPost();
@@ -124,7 +154,7 @@ watch(() => props.resourceTemplate.template, async (templateText) => {
 function createActivityPubDocument()
 {
     try {
-        let templateText = toRaw(props.resourceTemplate.template);
+        let templateText = toRaw(props.modelValue.template);
         templateText = Handlebars.compile(templateText)(templateContext.value)
         return JSON.parse(templateText);
     } catch (error) {
@@ -135,7 +165,18 @@ function createActivityPubDocument()
 
 const document = computed(createActivityPubDocument);
 
-const validationResult = ref<ValidationResult | null>(null)
+watch(document, () => {
+    emit('update:modelValue', {
+        ...props.modelValue,
+        document: document.value,
+    })
+}, { deep: true }
+)
+
+const validationResult = ref<TemplateValidationResult | null>(null)
+
+
+
 
 function runValidation() {
     try {
@@ -143,23 +184,27 @@ function runValidation() {
         if (!parsed) {
             validationResult.value = {
                 valid: false,
-                errors: [{ message: 'Invalid JSON' }],
+                errors: [new JsonParseError("Invalid JSON")],
                 jsonParseError: true
             }
             return
         }
         const schemaId = 'schema:as2/activitystreams2'
-        validationResult.value = validateBySchemaId(schemaId, parsed)
-        if (!validationResult.value.valid) {
-            console.debug(
-                'Validation errors:',
-                validationResult.value.errors?.map((x: any) => x.message).join('; ')
-            )
+        validationResult.value = {
+            valid: true,
+            errors: [],
+            schemaValidation: validateBySchemaId(schemaId, parsed)
         }
-    } catch (err: any) {
+        // if (!validationResult.value.valid) {
+        //     console.debug(
+        //         'Validation errors:',
+        //         validationResult.value.errors?.map((x: any) => x.message).join('; ')
+        //     )
+        // }
+    } catch (err: unknown) {
         validationResult.value = {
             valid: false,
-            errors: [{ message: err.message }]
+            errors: [err instanceof Error ? err : new Error(String(err))]
         }
         console.log('Validation error', validationResult.value.errors[0]?.message)
     }
@@ -170,15 +215,13 @@ watch(document, () => {
 }, { deep: true })
 
 function applyTemplate() {
-    props.resourceTemplate.document = document.value
-    console.log("Applying template:", props.resourceTemplate)
-    emit('apply', props.resourceTemplate)
+    console.log("Applying template:", props.modelValue)
+    emit('apply', props.modelValue)
 }
 
 function saveTemplate() {
-    props.resourceTemplate.document = document.value
-    console.log("Saving template:", props.resourceTemplate)
-    emit('save', props.resourceTemplate)
+    console.log("Saving template:", props.modelValue)
+    emit('save', props.modelValue)
 }
 
 </script>

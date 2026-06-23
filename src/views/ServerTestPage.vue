@@ -560,7 +560,7 @@ watch(() => serverStore.activeServerId, () => {
             :exchange="result.diagnostics.sidecarExchange" />
         </div>
 
-        <HttpExchangePanel v-if="result.attempt" title="Browser Exchange" :exchange="result.attempt.exchange" />
+        <HttpExchangePanel v-if="result.exchange" title="Browser Exchange" :exchange="result.exchange" />
       </div>
     </div>
 

@@ -175,7 +175,7 @@ async function maybeDiagnoseCorsError(
 {
   const possibleCorsError = !statusCode /*error*/ || corsDiagnosticsServer.isPossibleCorsFailure(statusCode)
 
-  if (!(await corsDiagnosticsServer.isHealthy()) || !possibleCorsError) {
+  if (!possibleCorsError || !(await corsDiagnosticsServer.isHealthy())) {
     isLoading.value = false
     return
   }
