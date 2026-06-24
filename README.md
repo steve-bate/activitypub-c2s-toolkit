@@ -9,22 +9,24 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 ## Features
 
 - Fully browser-based
-- Direct interaction with ActivityPub servers via C2S API
-- OAuth 2.0 authorization support with diagnostic features
-- Support for OAuth2 CIMD
-- Support for OAuth2 Protected Resource Metadata 
-- Support for Mastodon legacy OAuth2 implementation
+- Direct interaction with ActivityPub servers via [C2S API](https://www.w3.org/TR/activitypub/#client-to-server-interactions)
+- [OAuth 2.0](https://oauth.net/2/) authorization support with diagnostic features
+- Support for [OAuth2 CIMD](https://client.dev/)
+- Support for RFC9728  - [OAuth2 Protected Resource Metadata](https://datatracker.ietf.org/doc/rfc9728/)
+- Supports RFC6750 [bearer tokens](https://datatracker.ietf.org/doc/html/rfc6750) (without an OAuth2 flow)
+- Support for Mastodon [legacy OAuth2](https://docs.joinmastodon.org/spec/oauth/) implementation
 - Authorized actor discovery using multiple methods
 - ActivityPub object preview and actions
-- Supports NodeInfo and WebFinger APIs
+- Supports [NodeInfo](https://github.com/jhass/nodeinfo) and [WebFinger](https://datatracker.ietf.org/doc/html/rfc7033) APIs
 - JSON browser for inspecting ActivityPub objects
 - [Media Upload Support](#media-upload-support)
 - [Embedded automated testing framework](docs/test-framework.md)
 - [Server capability reports with test results](#server-capability-reports)
-- [JSON capabilities data can be exported](#server-capabilities-data-export)
-- [Schema-driven ActivityPub resource editor](docs/resource-templates.md#form-templates)
-- [JSON template-based resource definition](docs/resource-templates.md#json-templates)
-- [Optional sidecar server for diagnosing CORS problems](docs/cors-sidecar.md)
+- [Server capabilities data export](#server-capabilities-data-export)
+- [Resource Posting Tools](docs/resource-templates.md)
+    - [Schema-driven ActivityPub resource editor](docs/resource-templates.md#form-based-template-editor)
+    - [JSON template-based resource definition](docs/resource-templates.md#json-template-editor)
+- Optional [sidecar server](docs/cors-sidecar.md) to help diagnose [CORS](https://developer.mozilla.org/en-US/docs/Web/HTTP/Guides/CORS) problems
 
 ## Media Upload Support
 
@@ -109,10 +111,6 @@ npm run preview
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## Author
-
-**[Steve Bate](https://github.com/steve-bate)**
 
 ## References
 
