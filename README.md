@@ -3,40 +3,52 @@
 A web-based development toolkit for testing and debugging ActivityPub servers that implement the Client-to-Server (C2S) protocol. 
 
 > [!NOTE]
-> This tool is designed for developers and server administrators to validate C2S implementations, not as an end-user client for social media activities (image sharing, microblogging, etc.). *It is still in early development.*
+> This tool is designed for developers and server administrators to validate C2S implementations, not as an end-user client for social media activities (image sharing, microblogging, etc.). *It is still in active development.*
 
 
 ## Features
 
-- 🌐 Fully browser-based
-- 🔐 OAuth 2.0 authorization support with diagnostic features
-- 🔑 Support for OAuth2 CIMD
-- 🛡️ Support for OAuth2 Protected Resource Metadata 
-- 🐘 Support for Mastodon legacy OAuth2 implementation
-- 🔍 Authorized actor discovery using multiple methods
-- 📡 Direct interaction with ActivityPub servers via C2S API
-- 👁️ ActivityPub object preview and actions
-- 🔌 Supports NodeInfo and WebFinger APIs
-- 📊 JSON browser for inspecting ActivityPub objects
-- 🧪 Built-in browser-first test framework with dependency-aware suite execution
-- 🧭 Inconclusive outcomes for non-failure states (for example empty inbox/outbox)
-- 💾 Local run history persistence with JSON export
-- 🌙 Dark mode
-- 🎨 Modern UI built with Vue 3 and Tailwind CSS
-- 🚀 Fast development with Vite
+- Fully browser-based
+- Direct interaction with ActivityPub servers via C2S API
+- OAuth 2.0 authorization support with diagnostic features
+- Support for OAuth2 CIMD
+- Support for OAuth2 Protected Resource Metadata 
+- Support for Mastodon legacy OAuth2 implementation
+- Authorized actor discovery using multiple methods
+- ActivityPub object preview and actions
+- Supports NodeInfo and WebFinger APIs
+- JSON browser for inspecting ActivityPub objects
+- [Media Upload Support](#media-upload-support)
+- [Embedded automated testing framework](docs/test-framework.md)
+- [Server capability reports with test results](#server-capability-reports)
+- [JSON capabilities data can be exported](#server-capabilities-data-export)
+- [Schema-driven ActivityPub resource editor](docs/resource-templates.md#form-templates)
+- [JSON template-based resource definition](docs/resource-templates.md#json-templates)
+- [Optional sidecar server for diagnosing CORS problems](docs/cors-sidecar.md)
+
+## Media Upload Support
+
+TODO - reference AP wiki page. Discuss issues with vague "spec"
+
+## Server Capability Reports
+
+A printable report describing capabilities and test results can be generated for a server. To generate a report, use the "Server Reports" option in the server menu.
+
+## Server Capabilities Data Export
+
+The servers table has an "Export JSON" button that can export many details about a C2S server (capabilities, test results, etc.). This can be useful for custom reporting like server comparison tables.
 
 ## Screenshots
 
-[![Add Server](docs/add-server-tn.png)](docs/add-server.png)&nbsp;&nbsp;&nbsp;&nbsp;[![OAuth Diagnostics](docs/oauth2-diagnostics-tn.png)](docs/oauth2-diagnostics.png)
+[![Add Server](docs/images/add-server-tn.png)](docs/images/add-server.png)&nbsp;&nbsp;&nbsp;&nbsp;[![OAuth Diagnostics](docs/images/oauth2-diagnostics-tn.png)](docs/images/oauth2-diagnostics.png)
 
-[![JSON Browser](docs/json-browser-tn.png)](docs/json-browser.png)&nbsp;&nbsp;&nbsp;&nbsp;[![Server Tables](docs/server-tables-tn2.png)](docs/server-tables.png)
+[![JSON Browser](docs/images/json-browser-tn.png)](docs/images/json-browser.png)&nbsp;&nbsp;&nbsp;&nbsp;[![Server Tables](docs/images/server-tables-tn2.png)](docs/images/server-tables.png)
+
 
 ## Roadmap
 
-- Advanced resource editors
 - Pluggable AP object previews and actions
-- Support for more activity and object types
-- Additional suites and assertion plugins for the test framework.
+- Test creation from resource templates
 
 ## Installation
 
@@ -67,12 +79,12 @@ npm run dev
 - **Routing**: Vue Router
 - **State Management**: Pinia (stores)
 - **Code Quality**: ESLint
+- **Forms**: FormKit
 
 ### Prerequisites
 
 - Node.js (version 16 or higher recommended)
 - npm or yarn package manager
-
 
 The application will be available at `http://localhost:5173` (or another port if 5173 is in use).
 
