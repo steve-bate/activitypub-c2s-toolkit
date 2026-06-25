@@ -10,6 +10,7 @@
  */
 
 import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
+import { xfetch } from "@/utils/httpExchange"
 
 /*export*/ interface WebFingerLink {
   rel: string
@@ -116,51 +117,23 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
     
     console.debug('Fetching WebFinger from', url.toString())
     
-    const headers = {
+    const exchange = await xfetch<WebFingerParams, WebFingerData>(url.toString(), {
+      method: 'GET',
+      headers: {
         'Accept': 'application/jrd+json, application/json'
       }
-
-    const response = await fetch(url.toString(), {
-      headers: headers
     })
     
-    if (!response.ok) {
-      console.debug(`WebFinger fetch failed with HTTP ${response.status}`)
-      return {
-        success: false,
-        error: `Failed to fetch WebFinger: HTTP ${response.status}`,
-        request: {
-          url: url.toString(),
-          headers: headers,
-          params: { resource }
-        },
-        response: {
-          status_code: response.status,
-          status_text: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-        }
-      }
-    }
-    
-    const data: WebFingerData = await response.json()
+    const data = exchange.response?.payload
     
     // Basic validation
-    if (!data.subject) {
+    if (!data?.subject) {
       console.debug('Invalid WebFinger format: missing subject')
       return {
         success: false,
         error: 'Invalid WebFinger response: missing subject field',
-        request: {
-          url: url.toString(),
-          headers: headers,
-          params: { resource }
-        },
-        response: {
-          status_code: response.status,
-          status_text: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          payload: data
-        }
+        request: exchange.request,
+        response: exchange.response
       }
     }
     
@@ -171,35 +144,11 @@ async function fetchWebFinger(domain: string, resource: string): Promise<WebFing
       return {
         success: false,
         error: 'No ActivityPub actor URI found in WebFinger links',
-        request: {
-          url: url.toString(),
-          headers: headers,
-          params: { resource }
-        },
-        response: {
-          status_code: response.status,
-          status_text: response.statusText,
-          headers: Object.fromEntries(response.headers.entries()),
-          payload: data
-        }
+        request: exchange.request,
+        response: exchange.response
       }
     }
     
-    const exchange = {
-      success: true,
-      request: {
-        url: url.toString(),
-        headers: headers,
-        params: { resource }
-      },
-      response: {
-        status_code: response.status,
-        status_text: response.statusText,
-        headers: Object.fromEntries(response.headers.entries()),
-        payload: data
-      }
-    }
-
     setCache(cacheKey, exchange)
     
     return exchange

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "schema:as2/collection",
+  "$ref": "schema:as2/collection-base",
+  "title": "Collection",
+  "type": "object",
+  "properties": {
+    "type": {
+      "oneOf": [
+        {
+          "const": "Collection"
+        },
+        {
+          "type": "array",
+          "contains": {
+            "const": "Collection"
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "type"
+  ]
+}

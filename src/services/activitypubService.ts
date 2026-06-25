@@ -4,6 +4,7 @@
  */
 
 import { HttpExchange, HttpRequestData, HttpResponseData } from '@/types/http'
+import { xfetch } from '@/utils/httpExchange'
 
 interface ActivityStreamsObject {
   '@context'?: string | string[] | Record<string, unknown>
@@ -60,65 +61,25 @@ export async function postActivityToOutbox(params: PostActivityParams): Promise<
     'Accept': 'application/activity+json, application/json'
   }
 
-  const requestData: ActivityRequest = {
-    url: outboxUrl,
-    headers: {
-      ...headers,
-      'Authorization': `Bearer ${accessToken.substring(0, 20)}...` // Redact token in logged request
-    },
-    params: activity,
-    timestamp: new Date().toISOString()
-  }
-
   try {
-    const response = await fetch(outboxUrl, {
+    const exchange = await xfetch<ActivityStreamsObject, ActivityStreamsObject | string>(outboxUrl, {
       method: 'POST',
       headers,
       body: JSON.stringify(activity)
     })
 
-    const responseHeaders: Record<string, string> = {}
-    response.headers.forEach((value, key) => {
-      responseHeaders[key] = value
-    })
-
-    const responseText = await response.text()
-    let responsePayload: ActivityStreamsObject | string
-
-    // Try to parse as JSON
-    try {
-      responsePayload = JSON.parse(responseText)
-    } catch {
-      responsePayload = responseText
-    }
-
-    const responseData: ActivityResponse = {
-      status_code: response.status,
-      status_text: response.statusText,
-      headers: responseHeaders,
-      payload: responsePayload
-    }
-
-    if (!response.ok) {
-      return {
-        success: false,
-        error: `HTTP ${response.status} ${response.statusText}${responseText ? `: ${responseText}` : ''}`,
-        request: requestData,
-        response: responseData
-      }
-    }
-
-    return {
-      success: true,
-      request: requestData,
-      response: responseData
-    }
+    return exchange
   } catch (error) {
     return {
       success: false,
       error: error instanceof Error ? error.message : String(error),
-      request: requestData
-    }
+      request: {
+        url: outboxUrl,
+        headers: headers,
+        params: activity,
+        timestamp: new Date().toISOString(),
+      },
+    };
   }
 }
 

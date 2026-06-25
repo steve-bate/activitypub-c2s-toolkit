@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "schema:as2/intransitiveactivity",
+  "$ref": "schema:as2/intransitiveactivity-base",
+  "title": "IntransitiveActivity",
+  "type": "object",
+  "properties": {
+    "type": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/types"
+        },
+        {
+          "type": "array",
+          "contains": {
+            "$ref": "#/$defs/types"
+          }
+        }
+      ]
+    }
+  },
+  "$defs": {
+    "types": {
+      "enum": ["IntransitiveActivity", "Arrive", "Travel"]
+    }
+  },
+  "required": [
+    "type"
+  ]
+}

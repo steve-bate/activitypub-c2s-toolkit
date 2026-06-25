@@ -3,6 +3,7 @@ import { computed, ref, onMounted, watch } from 'vue'
 import { useRouter, useRoute } from 'vue-router'
 import { useServerStore } from '@/stores/serverStore'
 import ActorEndpointsPanel from '@/components/ActorEndpointsPanel.vue'
+import ServerNotesPanel from '@/components/ServerNotesPanel.vue'
 import NodeInfoPanel from '@/components/NodeInfoPanel.vue'
 import { getNodeInfo } from '@/services/nodeinfoService'
 
@@ -15,9 +16,15 @@ const serverId = computed(() => {
   return Array.isArray(id) ? id[0] : id
 })
 
-const server = computed(() =>
-  serverStore.servers.find(s => s.id === serverId.value)
-)
+const server = computed({
+  get: () => serverStore.servers.find(s => s.id === serverId.value),
+  set: (updated) => {
+    const index = serverStore.servers.findIndex(s => s.id === serverId.value)
+    if (index !== -1 && updated) {
+      serverStore.servers[index] = updated
+    }
+  },
+})
 
 const isLoadingNodeInfo = ref(false)
 const nodeinfoError = ref<string | null>(null)
@@ -170,6 +177,8 @@ watch(
       />
 
       <ActorEndpointsPanel :server="server" />
+
+      <ServerNotesPanel v-model="server" />
 
       <!-- Danger Zone -->
       <div class="bg-red-50 dark:bg-red-900/20 rounded-lg border-2 border-red-200 dark:border-red-800 p-6">

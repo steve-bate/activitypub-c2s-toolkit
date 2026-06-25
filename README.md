@@ -18,6 +18,9 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 - 👁️ ActivityPub object preview and actions
 - 🔌 Supports NodeInfo and WebFinger APIs
 - 📊 JSON browser for inspecting ActivityPub objects
+- 🧪 Built-in browser-first test framework with dependency-aware suite execution
+- 🧭 Inconclusive outcomes for non-failure states (for example empty inbox/outbox)
+- 💾 Local run history persistence with JSON export
 - 🌙 Dark mode
 - 🎨 Modern UI built with Vue 3 and Tailwind CSS
 - 🚀 Fast development with Vite
@@ -28,13 +31,12 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 
 [![JSON Browser](docs/json-browser-tn.png)](docs/json-browser.png)&nbsp;&nbsp;&nbsp;&nbsp;[![Server Tables](docs/server-tables-tn2.png)](docs/server-tables.png)
 
-
 ## Roadmap
 
 - Advanced resource editors
 - Pluggable AP object previews and actions
 - Support for more activity and object types
-- Built-in C2S server tests with a runner and report generator.
+- Additional suites and assertion plugins for the test framework.
 
 ## Installation
 

@@ -374,7 +374,7 @@ watch(
           <!-- Actor Input -->
           <div>
             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-              Actor URI or Fedi Handle
+              Actor/Object URI or Fediverse Handle
             </label>
             <div class="flex gap-2">
               <input

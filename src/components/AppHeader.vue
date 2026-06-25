@@ -108,49 +108,57 @@ function handleDeleteServer() {
         <!-- Server Menu -->
         <div class="relative">
           <!-- Trigger button -->
-          <button
-            @click="toggleServerMenu"
-            :disabled="!hasServers"
+          <button @click="toggleServerMenu" :disabled="!hasServers"
             :title="hasServers ? serverStore.activeServer?.name : 'No server configured'"
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors"
             :class="hasServers
               ? 'text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-              : 'text-gray-400 dark:text-gray-600 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'"
-          >
+              : 'text-gray-400 dark:text-gray-600 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'">
             <!-- Server icon -->
             <ServerIcon class="w-4 h-4 shrink-0" />
             <span class="max-w-[10rem] truncate">
               {{ hasServers ? (serverStore.activeServer?.name ?? 'Select server') : 'No server' }}
             </span>
             <!-- Chevron -->
-            <DisclosureIcon
-              class="w-3.5 h-3.5 shrink-0 transition-transform"
-              :class="serverMenuOpen ? '-rotate-90' : 'rotate-90'"
-            />
+            <DisclosureIcon class="w-3.5 h-3.5 shrink-0 transition-transform"
+              :class="serverMenuOpen ? '-rotate-90' : 'rotate-90'" />
           </button>
 
           <!-- Dropdown panel -->
-          <div
-            v-if="serverMenuOpen && hasServers"
-            class="absolute right-0 mt-2 w-60 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50"
-          >
+          <div v-if="serverMenuOpen && hasServers"
+            class="absolute right-0 mt-2 w-60 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
             <!-- Overview -->
-            <button
-              @click="navigate(`/servers/${serverStore.activeServer!.id}`)"
-              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
-            >
+            <button @click="navigate(`/servers/${serverStore.activeServer!.id}`)"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
               <DocumentIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               Overview
             </button>
 
             <!-- Authorization (label and icon adapt to auth type) -->
-            <button
-              @click="navigate(`/servers/${serverStore.activeServer!.id}/auth`)"
-              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
-            >
-              <ProtectIcon v-if="serverStore.activeServer?.auth?.authType === 'oauth2'" class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+            <button @click="navigate(`/servers/${serverStore.activeServer!.id}/auth`)"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
+              <ProtectIcon v-if="serverStore.activeServer?.auth?.authType === 'oauth2'"
+                class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               <KeyIcon v-else class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               {{ authLabel }}
+            </button>
+
+            <!-- Tests -->
+            <button @click="navigate('/tests')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
+              <svg class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" fill="none" stroke="currentColor"
+                viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                  d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
+              </svg>
+              Tests
+            </button>
+
+            <!-- Server Report -->
+            <button @click="navigate(`/servers/${serverStore.activeServer!.id}/report`)"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
+              <DocumentIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
+              Server Report
             </button>
 
             <!-- Separator -->
@@ -158,21 +166,18 @@ function handleDeleteServer() {
 
             <!-- Switch Server (only when multiple servers exist) -->
             <template v-if="hasMultipleServers">
-              <p class="px-3 pt-1.5 pb-0.5 text-[0.65rem] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500">
+              <p
+                class="px-3 pt-1.5 pb-0.5 text-[0.65rem] uppercase tracking-wider font-semibold text-gray-400 dark:text-gray-500">
                 Switch Server
               </p>
-              <button
-                v-for="server in serverStore.servers"
-                :key="server.id"
-                @click="selectServer(server.id)"
-                class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors"
-                :class="server.id === serverStore.activeServerId
+              <button v-for="server in serverStore.servers" :key="server.id" @click="selectServer(server.id)"
+                class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors" :class="server.id === serverStore.activeServerId
                   ? 'bg-blue-50 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium'
-                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'"
-              >
+                  : 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'">
                 <ServerIcon class="w-3.5 h-3.5 shrink-0 opacity-60" />
                 <span class="truncate flex-1">{{ server.name }}</span>
-                <CheckmarkIcon v-if="server.id === serverStore.activeServerId" class="w-3.5 h-3.5 shrink-0 text-blue-500" />
+                <CheckmarkIcon v-if="server.id === serverStore.activeServerId"
+                  class="w-3.5 h-3.5 shrink-0 text-blue-500" />
               </button>
             </template>
 
@@ -180,19 +185,15 @@ function handleDeleteServer() {
             <div class="my-1 border-t border-gray-200 dark:border-gray-700" />
 
             <!-- Add Server Config -->
-            <button
-              @click="navigate('/servers/new')"
-              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
-            >
+            <button @click="navigate('/servers/new')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
               <AddIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               Add Server Config
             </button>
 
             <!-- Delete Server Config -->
-            <button
-              @click="handleDeleteServer"
-              class="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors"
-            >
+            <button @click="handleDeleteServer"
+              class="w-full text-left px-3 py-2 text-sm text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 flex items-center gap-2 transition-colors">
               <TrashIcon class="w-4 h-4 shrink-0" />
               Delete Server Config
             </button>
@@ -205,84 +206,63 @@ function handleDeleteServer() {
         <!-- Actor Menu -->
         <div class="relative">
           <!-- Trigger button -->
-          <button
-            @click="toggleActorMenu"
-            :disabled="!hasActor"
+          <button @click="toggleActorMenu" :disabled="!hasActor"
             :title="hasActor ? actorDisplayName : 'No actor discovered'"
             class="flex items-center gap-1.5 px-3 py-1.5 rounded-md text-sm transition-colors"
             :class="hasActor
               ? 'text-gray-700 dark:text-gray-200 border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600'
-              : 'text-gray-400 dark:text-gray-600 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'"
-          >
+              : 'text-gray-400 dark:text-gray-600 border border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-800 cursor-not-allowed opacity-60'">
             <!-- Actor icon -->
             <PersonIcon class="w-4 h-4 shrink-0" />
             <span class="max-w-[10rem] truncate">
               {{ actorDisplayName }}
             </span>
             <!-- Chevron -->
-            <DisclosureIcon
-              class="w-3.5 h-3.5 shrink-0 transition-transform"
-              :class="actorMenuOpen ? '-rotate-90' : 'rotate-90'"
-            />
+            <DisclosureIcon class="w-3.5 h-3.5 shrink-0 transition-transform"
+              :class="actorMenuOpen ? '-rotate-90' : 'rotate-90'" />
           </button>
 
           <!-- Dropdown panel -->
-          <div
-            v-if="actorMenuOpen && hasActor"
-            class="absolute right-0 mt-2 w-60 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50"
-          >
+          <div v-if="actorMenuOpen && hasActor"
+            class="absolute right-0 mt-2 w-60 bg-white dark:bg-gray-800 rounded-lg shadow-xl border border-gray-200 dark:border-gray-700 py-1 z-50">
             <!-- Actor Profile -->
-            <button
-              @click="navigateToActorResource('id')"
-              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
-            >
+            <button @click="navigateToActorResource('id')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
               <PersonIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               Actor
             </button>
 
             <!-- Inbox -->
-            <button
-              @click="navigateToActorResource('inbox')"
-              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
-            >
+            <button @click="navigateToActorResource('inbox')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
               <LetterIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               Inbox
             </button>
 
             <!-- Outbox -->
-            <button
-              @click="navigateToActorResource('outbox')"
-              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
-            >
+            <button @click="navigateToActorResource('outbox')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
               <ExitIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               Outbox
             </button>
 
             <div class="my-1 border-t border-gray-200 dark:border-gray-700" />
 
-            <button
-              @click="navigate('/post')"
-              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
-            >
-              <AddIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />              Create Resource
+            <button @click="navigate('/post')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
+              <AddIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" /> POST Resource
             </button>
 
-            <button
-              @click="navigate('/upload-media')"
-              :disabled="!canUploadMedia"
-              class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors"
-              :class="canUploadMedia
+            <button @click="navigate('/upload-media')" :disabled="!canUploadMedia"
+              class="w-full text-left px-3 py-2 text-sm flex items-center gap-2 transition-colors" :class="canUploadMedia
                 ? 'text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700'
-                : 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60'"
-            >
+                : 'text-gray-400 dark:text-gray-600 cursor-not-allowed opacity-60'">
               <DocumentIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               Upload Media
             </button>
 
-            <button
-              @click="navigate('/follow')"
-              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors"
-            >
+            <button @click="navigate('/follow')"
+              class="w-full text-left px-3 py-2 text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-2 transition-colors">
               <PersonIcon class="w-4 h-4 shrink-0 text-gray-400 dark:text-gray-500" />
               Follow
             </button>
@@ -293,15 +273,15 @@ function handleDeleteServer() {
         </div>
 
         <!-- Settings button -->
-        <RouterLink
-          to="/settings"
-          title="Settings"
-          class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-        >
+        <RouterLink to="/settings" title="Settings"
+          class="p-2 text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-gray-100 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+          <!-- Toolbox icon -->
           <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+              d="M5 8h14a1 1 0 011 1v10a1 1 0 01-1 1H5a1 1 0 01-1-1V9a1 1 0 011-1z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M9 8V6a1 1 0 011-1h4a1 1 0 011 1v2" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 13h16" />
           </svg>
         </RouterLink>
 
@@ -310,4 +290,3 @@ function handleDeleteServer() {
     </div>
   </header>
 </template>
-

@@ -28,7 +28,9 @@ export const isJsonPayload = (
 ): boolean => {
   if (payload === null || payload === undefined) return false
   const normalized = getNormalizedContentType(contentType, headers)
-  if (normalized.includes('json')) return true
+  if (normalized.includes('json')) {
+    return true
+  } 
   return typeof payload === 'object'
 }
 
@@ -42,7 +44,7 @@ export const getJsonCopyText = (
   if (typeof payload === 'string') return payload
   if ((payload === null || payload === undefined) && payloadRaw) return payloadRaw
   if (payload === null || payload === undefined) return ''
-  return formatJson(payload as object)
+  return formatJson(payload)
 }
 
 export const getHighlightedJson = (
@@ -51,5 +53,6 @@ export const getHighlightedJson = (
   headers: Record<string, string> | null | undefined
 ): string => {
   if (!isJsonPayload(payload, contentType, headers) || !payload) return ''
-  return syntaxHighlightJson(formatJson(payload as object))
+  if (typeof payload === 'string') return syntaxHighlightJson(formatJson(JSON.parse(payload)))
+  return syntaxHighlightJson(formatJson(payload))
 }

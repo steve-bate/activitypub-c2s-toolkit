@@ -377,7 +377,7 @@ export async function discoverActor(
   
   const actorData: ActorDiscoveryResult = {
     success: true,
-    method: discoveryMethod as ActorDiscoveryMethod,
+    method: discoveryMethod,
     actor: actorFetchExchange.response?.payload,
     actorFetchExchange,
     introspectionExchange,

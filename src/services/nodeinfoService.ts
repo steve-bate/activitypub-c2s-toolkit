@@ -11,6 +11,7 @@
  */
 
 import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
+import { xfetch } from "@/utils/httpExchange"
 
 /*export*/ interface NodeInfoLink {
   rel: string
@@ -47,13 +48,6 @@ import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
   metadata?: Record<string, unknown>
 }
 
-/*export*/ interface HttpRequestResult {
-  status: number
-  statusText: string
-  headers: Record<string, string>
-  url: string
-}
-
 export type NodeInfoIndexRequest = HttpRequestData;
 export type NodeInfoIndexResponse = HttpResponseData<NodeInfoIndex>;
 export type NodeInfoIndexExchange = HttpExchange<NodeInfoIndexRequest, NodeInfoIndexResponse>;
@@ -62,36 +56,21 @@ export type NodeInfoDataRequest = HttpRequestData;
 export type NodeInfoDataResponse = HttpResponseData<NodeInfo>;
 export type NodeInfoDataExchange = HttpExchange<NodeInfoDataRequest, NodeInfoDataResponse>;
 
-// Cache for NodeInfo requests
-const cache = new Map<string, { data: NodeInfoDataExchange; timestamp: number }>()
-const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
+type CacheData = NodeInfoDataExchange | NodeInfoIndexExchange | undefined
 
-/**
- * Extract HTTP request details from a Response object
- */
-function extractHttpRequestResult(response: Response): HttpRequestResult {
-  const headers: Record<string, string> = {}
-  response.headers.forEach((value, key) => {
-    headers[key] = value
-  })
-  
-  return {
-    status: response.status,
-    statusText: response.statusText,
-    headers,
-    url: response.url
-  }
-}
+// Cache for NodeInfo requests
+const cache = new Map<string, { data: CacheData; timestamp: number }>()
+const CACHE_DURATION = 5 * 60 * 1000 // 5 minutes
 
 /**
  * Get cached data if available and not expired
  */
-function getCachedResult(
+function getCachedResult<T>(
   key: string,
-): NodeInfoDataExchange | null {
+): T | null {
   const cached = cache.get(key);
   if (cached && Date.now() - cached.timestamp < CACHE_DURATION) {
-    return cached.data;
+    return cached.data as T;
   }
   return null;
 }
@@ -99,74 +78,83 @@ function getCachedResult(
 /**
  * Set cache data
  */
-function setCacheResult(key: string, data: NodeInfoDataExchange): void {
+function setCacheResult(key: string, data: CacheData): void {
   cache.set(key, { data, timestamp: Date.now() })
+}
+
+async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexExchange> {
+  const url = `${baseUrl}/.well-known/nodeinfo`
+  const exchange = await xfetch<unknown, NodeInfoIndex>(url)
+
+  // TODO check that links exist?
+
+  return exchange
 }
 
 /**
  * Fetch NodeInfo index from /.well-known/nodeinfo
  */
-async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexExchange> {
-  try {
-    const url = `${baseUrl}/.well-known/nodeinfo`
-    console.debug('Fetching NodeInfo index from', url)
+// async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexExchange> {
+//   try {
+//     const url = `${baseUrl}/.well-known/nodeinfo`
+//     console.debug('Fetching NodeInfo index from', url)
 
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json'
-      }
-    })
+//     const response = await fetch(url, {
+//       headers: {
+//         'Accept': 'application/json'
+//       }
+//     })
 
-    const httpRequest = extractHttpRequestResult(response)
+//     const httpRequest = extractHttpRequestResult(response)
 
-    if (!response.ok) {
-      console.debug(`NodeInfo index fetch failed with HTTP ${response.status}`)
-      const result = {
-        success: false,
-        error: `Failed to fetch NodeInfo index: HTTP ${response.status} ${response.statusText}`,
-        response: {
-          status_code: response.status,
-          status_text: response.statusText,
-          headers: httpRequest.headers,
-        },
-      }
-      return result
-    }
+//     if (!response.ok) {
+//       console.debug(`NodeInfo index fetch failed with HTTP ${response.status}`)
+//       const result = {
+//         success: false,
+//         error: `Failed to fetch NodeInfo index: HTTP ${response.status} ${response.statusText}`,
+//         response: {
+//           status_code: response.status,
+//           status_text: response.statusText,
+//           headers: httpRequest.headers,
+//         },
+//       }
+//       return result
+//     }
 
-    const data = await response.json()
+//     const data = await response.json()
     
-    if (!data.links || !Array.isArray(data.links)) {
-      console.debug('Invalid NodeInfo index format')
-      const result = {
-        success: false,
-        error: 'Invalid NodeInfo index format: missing or invalid links array',
-        response: {
-          status_code: response.status,
-          status_text: response.statusText,
-          headers: httpRequest.headers,
-        }
-      }
-      return result
-    }
+//     if (!data.links || !Array.isArray(data.links)) {
+//       console.debug('Invalid NodeInfo index format')
+//       const result = {
+//         success: false,
+//         error: 'Invalid NodeInfo index format: missing or invalid links array',
+//         response: {
+//           status_code: response.status,
+//           status_text: response.statusText,
+//           headers: httpRequest.headers,
+//         }
+//       }
+//       return result
+//     }
 
-    return {
-      success: true,
-      response: {
-        status_code: response.status,
-        status_text: response.statusText,
-        headers: httpRequest.headers,
-        payload: data,
-      }
-    };
+//     return {
+//       success: true,
+//       response: {
+//         status_code: response.status,
+//         status_text: response.statusText,
+//         headers: httpRequest.headers,
+//         payload: data,
+//       }
+//     };
 
-  } catch (error) {
-    console.debug('NodeInfo index fetch error:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }
-  }
-}
+//   } catch (error) {
+//     console.debug('NodeInfo index fetch error:', error)
+//     return {
+//       success: false,
+//       error: error instanceof Error ? error.message : 'Unknown error'
+//     }
+//   }
+// }
 
 /**
  * Get the latest NodeInfo version URL from the index
@@ -195,82 +183,6 @@ function getLatestNodeInfoUrl(index: NodeInfoIndex): string | null {
 
   // Return the last link (usually the latest version)
   return links[links.length - 1].href
-}
-
-/**
- * Fetch NodeInfo from a specific URL
- */
-async function fetchNodeInfo(url: string): Promise<NodeInfoDataExchange> {
-  const cacheKey = `nodeinfo-data:${url}`
-  const cached = getCachedResult(cacheKey)
-  if (cached) {
-    console.debug('Using cached NodeInfo for', url)
-    return cached
-  }
-
-  try {
-    console.debug('Fetching NodeInfo from', url)
-    
-    const response = await fetch(url, {
-      headers: {
-        'Accept': 'application/json'
-      }
-    })
-
-    const httpRequest = extractHttpRequestResult(response)
-
-    if (!response.ok) {
-      console.debug(`NodeInfo fetch failed with HTTP ${response.status}`)
-      const result = {
-        success: false,
-        error: `Failed to fetch NodeInfo: HTTP ${response.status} ${response.statusText}`,
-        response: {
-          status_code: response.status,
-          status_text: response.statusText,
-          headers: httpRequest.headers,
-        }
-      }
-      return result
-    }
-
-    const data: NodeInfo = await response.json()
-    
-    // Basic validation
-    if (!data.software?.name || !data.software?.version) {
-      console.debug('Invalid NodeInfo format: missing software info')
-      return {
-        success: false,
-        error: 'Invalid NodeInfo format: missing software name or version',
-        response: {
-          status_code: response.status,
-          status_text: response.statusText,
-          headers: httpRequest.headers,
-          payload: data
-        }
-      }
-    }
-
-    const result = {
-      success: true,
-      response: {
-        status_code: response.status,
-        status_text: response.statusText,
-        headers: httpRequest.headers,
-        payload: data
-      }
-    }
-
-
-    setCacheResult(cacheKey, result)
-    return result
-
-  } catch (error) {
-    console.debug('NodeInfo fetch error:', error)
-    return {
-      success: false,
-      error: error instanceof Error ? error.message : 'Unknown error'
-    }
-  }
 }
 
 /**
@@ -304,12 +216,18 @@ export async function getNodeInfo(baseUrl: string)
     ]
   }
 
+  const cachedInfoExchange = getCachedResult<NodeInfoDataExchange>(nodeinfoUrl)
+  if (cachedInfoExchange) {
+    return [indexExchange, cachedInfoExchange]
+  }
+
   // Fetch the NodeInfo document
-  const dataExchange = await fetchNodeInfo(nodeinfoUrl)
+  const infoExchange = await xfetch<unknown, NodeInfo>(nodeinfoUrl)
+  setCacheResult(nodeinfoUrl, infoExchange)
 
   return [
     indexExchange,
-    dataExchange
+    infoExchange
   ]
 }
 

@@ -1,0 +1,25 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "schema:as2/collectionpage",
+  "$ref": "schema:as2/collectionpage-base",
+  "title": "CollectionPage",
+  "type": "object",
+  "properties": {
+    "type": {
+      "oneOf": [
+        {
+          "const": "CollectionPage"
+        },
+        {
+          "type": "array",
+          "contains": {
+            "const": "CollectionPage"
+          }
+        }
+      ]
+    }
+  },
+  "required": [
+    "type"
+  ]
+}

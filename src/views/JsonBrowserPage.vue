@@ -9,6 +9,10 @@ import { ref, watch, computed, onMounted } from 'vue'
 import { useRoute, useRouter } from 'vue-router'
 import { useServerStore } from '@/stores/serverStore'
 import RunningIcon from '@/components/icons/RunningIcon.vue'
+import { useCorsDiagnostics } from '@/composables/useCorsDiagnostics'
+import { CorsDiagnosticResult } from '@/utils/corsDiagnostics'
+
+const corsDiagnosticsServer = useCorsDiagnostics()
 
 const route = useRoute()
 const router = useRouter()
@@ -16,10 +20,20 @@ const serverStore = useServerStore()
 
 const responseData = ref<Record<string, unknown> | undefined>(undefined)
 const isLoading = ref(false)
+watch(isLoading, (newValue) => {
+  console.log('isLoading changed:', newValue)
+})
 const error = ref<string | null>(null)
 const httpExchange = ref<HttpExchange<HttpRequestData, HttpResponseData> | undefined>(undefined)
 const showPreview = ref(false)
 const referringProperty = ref<string | undefined>(undefined)
+
+const diagnosticResponseData = ref<CorsDiagnosticResult | undefined>(undefined)
+const showRawDiagnostics = ref(false)
+
+watch(showRawDiagnostics, (newValue) => {
+  console.log('showRawDiagnostics changed:', newValue, corsDiagnosticsServer.diagnosticsResult)
+})
 
 const isActivityPub = computed(() => {
   const context = responseData.value?.['@context']
@@ -154,6 +168,39 @@ async function handleProxyFetch(proxyUrl: string, targetUri: string) {
   }
 } 
 
+async function maybeDiagnoseCorsError(
+    url: string, 
+    headers: Record<string, string>, 
+    statusCode?: number) 
+{
+  const possibleCorsError = !statusCode /*error*/ || corsDiagnosticsServer.isPossibleCorsFailure(statusCode)
+
+  if (!possibleCorsError || !(await corsDiagnosticsServer.isHealthy())) {
+    isLoading.value = false
+    return
+  }
+
+  isLoading.value = true
+  error.value = null
+  diagnosticResponseData.value = undefined
+  httpExchange.value = undefined
+
+  try {
+    const result = await corsDiagnosticsServer.getCorsDiagnostics({ url, headers })
+    if (result) {
+      diagnosticResponseData.value = result
+    } else {
+      error.value = 'CORS diagnostics failed or returned no data.'
+    }
+  } catch (err) {
+    error.value = err instanceof Error ? err.message : 'Failed to run CORS diagnostics'
+    console.error('CORS diagnostics error:', err)
+  } finally {
+    isLoading.value = false
+    error.value = "Potential CORS issue detected. See diagnostics below for details."
+  }
+}
+
 /**
  * Fetch URI with ActivityPub headers and access token
  */
@@ -165,22 +212,21 @@ async function handleFetch(uri: string) {
   responseData.value = undefined
   httpExchange.value = undefined
   
+  //const requestHeadersData: Record<string, string> = {}
+
+  const fetchHeaders: Record<string, string> = {
+    'Accept': 'application/activity+json'
+  }
+
   try {
-    const activeServer = serverStore.activeServer
-    const requestHeadersData: Record<string, string> = {}
-    
+    const activeServer = serverStore.activeServer    
     // Add authorization if we have a token
     const accessToken = activeServer?.auth?.bearerToken;
     if (accessToken && activeServer.origin && uri.startsWith(activeServer.origin)) {
-      requestHeadersData['Authorization'] = `Bearer ${accessToken}`
+      fetchHeaders['Authorization'] = `Bearer ${accessToken}`
     }
     else if (activeServer?.actor?.profile.endpoints?.proxyUrl) {
       return handleProxyFetch(activeServer?.actor?.profile.endpoints?.proxyUrl, uri)
-    }
-    
-    const fetchHeaders: Record<string, string> = {
-      ...requestHeadersData,
-      'Accept': 'application/activity+json'
     }
 
     let response: Response
@@ -239,6 +285,8 @@ async function handleFetch(uri: string) {
         payload: data
       }
     }
+
+    await maybeDiagnoseCorsError(uri, fetchHeaders, response.status)
   } catch (err) {
     if (err instanceof Error && (err.message?.includes('CORS') || err.name === 'TypeError')) {
       error.value = 'CORS Error: The server does not allow cross-origin requests. This is a server configuration issue. To fix: the server needs to add "Accept" and "Authorization" to Access-Control-Allow-Headers.'
@@ -246,6 +294,7 @@ async function handleFetch(uri: string) {
       error.value = err instanceof Error ? err.message : 'Failed to fetch URI'
     }
     console.error('Fetch error:', err)
+    await maybeDiagnoseCorsError(uri, fetchHeaders)
   } finally {
     isLoading.value = false
   }
@@ -383,6 +432,38 @@ watch(
           :data="responseData" 
           @fetch-uri="handleClickedUri" 
         />
+
+        <div v-if="diagnosticResponseData" class="pl-4">
+          <h2 class="mt-2 mb-1">Prelight Notes</h2>
+          <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
+            <li v-for="(note, index) in diagnosticResponseData?.details.preflight?.notes" :key="index">
+              {{ note }}
+            </li>
+          </ul>
+          <h2 class="mt-2 mb-1">Request Notes</h2>
+          <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
+            <li v-for="(note, index) in diagnosticResponseData?.details.proxy?.notes" :key="index">
+              {{ note }}
+            </li>
+          </ul>
+          <h2 class="mt-2 mb-1">Issues</h2>
+          <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
+            <li v-for="(issue, index) in diagnosticResponseData?.issues" :key="index">
+              <span class="font-semibold text-red-400">{{ issue }}</span>
+            </li>
+          </ul>
+          <h2 class="mt-2 mb-1">Response Headers</h2>
+          <ul class="list-disc list-inside text-sm text-gray-600 dark:text-gray-400">
+            <li v-for="(value, key) in diagnosticResponseData?.proxyResponse?.headers" :key="key">
+              <span class="font-semibold uppercase text-green-400">{{ key }}:</span> {{ value }}
+            </li>
+          </ul>
+          <label for="show-raw-diagnostics" class="inline-flex items-center mt-2 cursor-pointer text-sm text-gray-600 dark:text-gray-400">
+            <input type="checkbox" v-model="showRawDiagnostics" id="show-raw-diagnostics" class="mr-2">
+            Raw Diagnostics
+          </label>
+          <pre v-if="showRawDiagnostics" class="mt-2 bg-gray-100 dark:bg-gray-700 p-2 rounded text-xs overflow-x-auto">{{ diagnosticResponseData }}</pre>
+        </div>
 
         <!-- HTTP Exchange Panel -->
         <div v-if="httpExchange" class="mt-4">

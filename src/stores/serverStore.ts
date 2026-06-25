@@ -5,6 +5,7 @@ import type { NodeInfoDataExchange, NodeInfoIndexExchange } from '@/services/nod
 import { ClientConfig, TokenExchangeHttpExchange, TokenRefreshHttpExchange, TokenRevocationHttpExchange } from '@/services/authorizationService'
 import { ActorDiscoveryResult, ActorProfile } from '@/services/actorDiscoveryService'
 import { ClientRegistrationResult } from '@/services/clientRegistrationService'
+import type { TestSuiteRunResult } from '@/testing/core/types'
 
 
 const STORAGE_KEY = 'c2s_servers'
@@ -41,6 +42,16 @@ export interface AuthData {
   oauth2?: OAuth2Data
 }
 
+export interface ServerTestingConfig {
+  sidecarUrl?: string
+  selectedTests?: string[]
+  results?: TestSuiteRunResult
+}
+
+export interface ServerTestingConfigInput {
+  sidecarUrl?: string
+}
+
 export interface ResourceServerMetadata {
   id: string // generated unique ID for this server configuration
  
@@ -50,6 +61,7 @@ export interface ResourceServerMetadata {
   // TODO Remove
   name?: string
   identifier?: string
+  notes?: string
 
   auth?: AuthData
 
@@ -59,6 +71,8 @@ export interface ResourceServerMetadata {
   }
 
   nodeinfo?: NodeInfoData
+
+  testing?: ServerTestingConfig
 
   // Timestamps
   createdAt: string
@@ -100,7 +114,7 @@ export const useServerStore = defineStore('server', () => {
     try {
       const stored = localStorage.getItem(STORAGE_KEY)
       if (stored) {
-        return JSON.parse(stored)
+        return JSON.parse(stored) as ResourceServerMetadata[]
       }
     } catch (e) {
       console.error('Failed to load servers from localStorage:', e)
@@ -298,6 +312,15 @@ export const useServerStore = defineStore('server', () => {
     return true
   }
 
+  function saveServerNotes(serverId: string, notes: string): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'notes', notes)
+  }
+  
+  function getServerNotes(serverId: string): string | null {
+    const server = servers.value.find(s => s.id === serverId)
+    return server?.notes ?? null
+  }
+
   /**
    * Save RFC 8414 discovery metadata with method and response details
    */
@@ -418,6 +441,34 @@ export const useServerStore = defineStore('server', () => {
     })
   }
 
+  function saveTestConfig(serverId: string, config: ServerTestingConfigInput): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'testing.sidecarUrl', config.sidecarUrl)
+  }
+
+  function saveTestSelection(serverId: string, selectedTestIds: string[]): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'testing.selectedTests', selectedTestIds)
+  }
+
+  function getTestSelection(serverId: string): string[] {
+    const server = servers.value.find((entry) => entry.id === serverId)
+    return Array.isArray(server?.testing?.selectedTests)
+      ? server.testing.selectedTests
+      : []
+  }
+
+  function saveTestResults(serverId: string, run: TestSuiteRunResult): ResourceServerMetadata | null {
+    return updateServerProperty(serverId, 'testing.results', run)
+  }
+
+  function getTestResults(serverId: string): TestSuiteRunResult | null {
+    const server = servers.value.find((entry) => entry.id === serverId)
+    return server?.testing?.results ?? null
+  }
+
+  function getActiveTestResults(): TestSuiteRunResult | null {
+    return activeServer.value?.testing?.results ?? null
+  }
+
 
   return {
     servers,
@@ -440,6 +491,14 @@ export const useServerStore = defineStore('server', () => {
     clearOAuthToken,
     saveTokenRevocation,
     setAuthStatus,
-    saveNodeInfo
+    saveNodeInfo,
+    saveTestConfig,
+    saveTestSelection,
+    saveTestResults,
+    getTestSelection,
+    getTestResults,
+    getActiveTestResults,
+    saveServerNotes,
+    getServerNotes,
   }
 })

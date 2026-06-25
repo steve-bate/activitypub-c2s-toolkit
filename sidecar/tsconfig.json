@@ -1,0 +1,4 @@
+{
+  "extends": "../tsconfig.sidecar.json",
+  "include": ["./**/*.ts"]
+}
