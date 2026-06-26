@@ -25,6 +25,28 @@ function formatLastUsed(dateString: string | undefined): string {
   const date = new Date(dateString)
   return date.toLocaleString()
 }
+
+function isTokenExpired(server: ResourceServerMetadata): boolean {
+  const createdAt = server.auth?.oauth2?.tokenExchange?.request?.timestamp
+  if (!createdAt) return false
+
+  const createdAtMs = new Date(createdAt).getTime()
+
+  const tokenExchange = server.auth?.oauth2?.tokenExchange?.response?.payload
+
+  const expiresInMs =
+    tokenExchange && 'expires_in' in tokenExchange
+      ? tokenExchange.expires_in! * 1000
+      : undefined
+  if (!expiresInMs) return false
+
+  const currentTimeMs = Date.now()
+  const remainingMs = expiresInMs - (currentTimeMs - createdAtMs)
+
+  return remainingMs <= 0
+
+}
+
 </script>
 
 <template>
@@ -73,7 +95,7 @@ function formatLastUsed(dateString: string | undefined): string {
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
             {{ server.auth?.authType === 'oauth2' ? 'OAuth2' : 'Bearer' }}
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm" :class="server.auth?.authStatus === 'authorized' ? 'text-green-600 dark:text-green-400 font-medium' : server.auth?.authStatus === 'token-expired' ? 'text-gray-700 dark:text-gray-300' : 'text-orange-600 dark:text-orange-400 font-medium'">
+          <td class="px-6 py-4 whitespace-nowrap text-sm" :class="server.auth?.authStatus === 'authorized' ? 'text-green-600 dark:text-green-400 font-medium' : server.auth?.authStatus === 'token-expired' || isTokenExpired(server) ? 'text-gray-700 dark:text-gray-300' : 'text-orange-600 dark:text-orange-400 font-medium'">
             {{ formatAuthStatus(server.auth?.authStatus!) }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">

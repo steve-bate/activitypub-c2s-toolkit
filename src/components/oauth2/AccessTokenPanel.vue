@@ -126,7 +126,7 @@ onUnmounted(() => {
         </button>
         <button
           @click="emit('revoke')"
-          :disabled="isRevoking"
+          :disabled="isRevoking || !server.auth?.oauth2?.authServerDiscovery?.authorizationServerMetadata?.revocation_endpoint"
           class="px-3 py-1.5 bg-red-600 hover:bg-red-700 disabled:bg-gray-400 disabled:cursor-not-allowed text-white text-sm font-medium rounded-md transition-colors flex items-center gap-2"
         >
           <RunningIcon v-if="isRevoking"/>

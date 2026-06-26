@@ -84,7 +84,11 @@ function setCacheResult(key: string, data: CacheData): void {
 
 async function fetchNodeInfoIndex(baseUrl: string): Promise<NodeInfoIndexExchange> {
   const url = `${baseUrl}/.well-known/nodeinfo`
-  const exchange = await xfetch<unknown, NodeInfoIndex>(url)
+  const exchange = await xfetch<unknown, NodeInfoIndex>(url, {
+    headers: {
+      'Accept': 'application/json'
+    }
+  })
 
   // TODO check that links exist?
 

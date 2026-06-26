@@ -139,7 +139,11 @@ const tests: TestCaseDefinition[] = [
       console.debug(`Fetching NodeInfo from ${indexUrl}`)
 
       const indexOutcome = await tools.executeRequest(
-        { url: indexUrl },
+        { url: indexUrl,
+          headers: {
+            'Accept': 'application/json'
+         },
+        },
         [
           {
             kind: "status",

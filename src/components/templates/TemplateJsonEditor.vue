@@ -50,7 +50,7 @@
             <button class="px-4 py-1 rounded focus:outline-none focus:ring-2 focus:ring-blue-400
         bg-gray-600 text-white hover:bg-gray-600
         disabled:bg-gray-400 disabled:text-gray-200 disabled:cursor-not-allowed"
-                @click="emit('cancel')">Cancel</button>
+                @click="emit('cancel')">Templates</button>
 
             <div class="ml-2">
                 <span v-if="validationResult" :class="validationResult.valid

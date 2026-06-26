@@ -572,6 +572,9 @@ export async function revokeToken(
     const credentials = btoa(`${clientConfig.clientId}:${clientConfig.clientSecret}`)
     headers['Authorization'] = `Basic ${credentials}`
   }
+  else {
+    headers['Authorization'] = `Bearer ${token}`
+  }
   
   try {
     const response = await fetch(serverMetadata.revocation_endpoint, {
