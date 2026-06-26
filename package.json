@@ -17,6 +17,7 @@
   "dependencies": {
     "@formkit/icons": "^2.1.0",
     "@formkit/vue": "^2.1.0",
+    "@vueuse/core": "^14.3.0",
     "ajv": "^8.20.0",
     "ajv-formats": "^3.0.1",
     "dayjs": "^1.11.21",

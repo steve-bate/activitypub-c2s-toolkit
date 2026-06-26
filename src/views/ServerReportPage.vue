@@ -3,6 +3,8 @@ import { computed, onMounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useServerStore } from '@/stores/serverStore'
 import type { TestStatus } from '@/testing/core/types'
+import PrinterIcon from '@/components/icons/PrinterIcon.vue'
+import { createReusableTemplate } from '@vueuse/core'
 
 const route = useRoute()
 const serverStore = useServerStore()
@@ -99,9 +101,36 @@ function formatDuration(ms: number) {
 function printReport() {
   window.print()
 }
+
+const [DefineSectionHeading, SectionHeading] = createReusableTemplate()
+const [DefineDataItemList, DataItemList] = createReusableTemplate()
+const [DefineDataItem, DataItem] = createReusableTemplate()
 </script>
 
 <template>
+  <DefineSectionHeading v-slot="{ $slots }">
+    <h2 class="text-xl font-semibold text-gray-800 dark:text-white print:text-black mb-1">
+      <component :is="$slots.default" v-if="$slots.default" />
+    </h2>
+    <hr class="border-gray-200 dark:border-gray-700 print:border-gray-300 mb-4" />
+  </DefineSectionHeading>
+
+  <DefineDataItemList v-slot="{ $slots }">
+    <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
+      <component :is="$slots.default" v-if="$slots.default" />
+    </dl>
+  </DefineDataItemList>
+
+  <DefineDataItem v-slot="{ label, $slots }">
+    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">
+      {{ label }}
+    </dt>
+    <dd>
+      <component :is="$slots.default" v-if="$slots.default" />
+      <span v-else>—</span>
+    </dd>
+  </DefineDataItem>
+
   <!-- Screen chrome: page background + print button -->
   <div class="min-h-screen bg-gray-100 dark:bg-gray-900 print:bg-white py-8 print:py-0">
 
@@ -117,11 +146,7 @@ function printReport() {
       <div class="max-w-3xl mx-auto px-6 mb-4 flex justify-end print:hidden">
         <button @click="printReport"
           class="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
-          <!-- Printer Icon -->
-          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
-              d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
-          </svg>
+          <PrinterIcon />
           Print / Save as PDF
         </button>
       </div>
@@ -157,10 +182,7 @@ function printReport() {
 
           <!-- ── 1. Server Software ────────────────────────────────────────── -->
           <section>
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white print:text-black mb-1">
-              1. Server Software (NodeInfo)
-            </h2>
-            <hr class="border-gray-200 dark:border-gray-700 print:border-gray-300 mb-4" />
+            <SectionHeading>1. Server Software (NodeInfo)</SectionHeading>
 
             <div v-if="nodeinfoData" class="space-y-4">
 
@@ -172,82 +194,63 @@ function printReport() {
               </div>
 
               <!-- Key/value grid -->
-              <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Software</dt>
-                <dd>
+              <DataItemList>
+                <DataItem label="Software">
                   {{ nodeinfoData.software?.name ?? '—' }}
                   <span v-if="nodeinfoData.software?.version" class="text-gray-500 dark:text-gray-400"> v{{
                     nodeinfoData.software.version }}</span>
-                </dd>
-
-                <template v-if="nodeinfoData.software?.repository">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Repository</dt>
-                  <dd>
-                    <a :href="nodeinfoData.software.repository" target="_blank" rel="noopener noreferrer"
-                      class="text-blue-600 dark:text-blue-400 print:text-blue-700 hover:underline break-all">
-                      {{ nodeinfoData.software.repository }}
-                    </a>
-                  </dd>
-                </template>
-
-                <template v-if="nodeinfoData.software?.homepage">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Homepage</dt>
-                  <dd>
-                    <a :href="nodeinfoData.software.homepage" target="_blank" rel="noopener noreferrer"
-                      class="text-blue-600 dark:text-blue-400 print:text-blue-700 hover:underline break-all">
-                      {{ nodeinfoData.software.homepage }}
-                    </a>
-                  </dd>
-                </template>
-
-                <template v-if="nodeinfoData.protocols?.length">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Protocols</dt>
-                  <dd>{{ nodeinfoData.protocols.join(', ') }}</dd>
-                </template>
-
-                <template v-if="nodeinfoData.openRegistrations != null">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Open Registrations</dt>
-                  <dd>{{ nodeinfoData.openRegistrations ? 'Yes' : 'No' }}</dd>
-                </template>
-              </dl>
+                </DataItem>
+                <DataItem label="Repository" v-if="nodeinfoData.software?.repository">
+                  <a :href="nodeinfoData.software.repository" target="_blank" rel="noopener noreferrer"
+                    class="text-blue-600 dark:text-blue-400 print:text-blue-700 hover:underline break-all">
+                    {{ nodeinfoData.software.repository }}
+                  </a>
+                </DataItem>
+                <DataItem label="Homepage" v-if="nodeinfoData.software?.homepage">
+                  <a :href="nodeinfoData.software.homepage" target="_blank" rel="noopener noreferrer"
+                    class="text-blue-600 dark:text-blue-400 print:text-blue-700 hover:underline break-all">
+                    {{ nodeinfoData.software.homepage }}
+                  </a>
+                </DataItem>
+                <DataItem label="Protocols" v-if="nodeinfoData.protocols?.length">
+                  {{ nodeinfoData.protocols.join(', ') }}
+                </DataItem>
+                <DataItem label="Open Registrations" v-if="nodeinfoData.openRegistrations != null">
+                  {{ nodeinfoData.openRegistrations ? 'Yes' : 'No' }}
+                </DataItem>
+              </DataItemList>
 
               <!-- Services -->
               <div v-if="nodeinfoData.services?.inbound?.length || nodeinfoData.services?.outbound?.length"
                 class="mt-2">
                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400 print:text-gray-500 mb-1">Services</p>
-                <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-                  <template v-if="nodeinfoData.services?.inbound?.length">
-                    <dt class="text-gray-500 dark:text-gray-400 print:text-gray-500">Inbound</dt>
-                    <dd>{{ nodeinfoData.services.inbound.join(', ') }}</dd>
-                  </template>
-                  <template v-if="nodeinfoData.services?.outbound?.length">
-                    <dt class="text-gray-500 dark:text-gray-400 print:text-gray-500">Outbound</dt>
-                    <dd>{{ nodeinfoData.services.outbound.join(', ') }}</dd>
-                  </template>
-                </dl>
+                <DataItemList>
+                  <DataItem label="Inbound" v-if="nodeinfoData.services?.inbound?.length">
+                    {{ nodeinfoData.services.inbound.join(', ') }}
+                  </DataItem>
+                  <DataItem label="Outbound" v-if="nodeinfoData.services?.outbound?.length">
+                    {{ nodeinfoData.services.outbound.join(', ') }}
+                  </DataItem>
+                </DataItemList>
               </div>
 
               <!-- Usage stats -->
               <div v-if="nodeinfoData.usage" class="mt-2">
                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400 print:text-gray-500 mb-1">Usage</p>
-                <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
-                  <template v-if="nodeinfoData.usage.users?.total != null">
-                    <dt class="text-gray-500 dark:text-gray-400 print:text-gray-500">Total Users</dt>
-                    <dd>{{ nodeinfoData.usage.users.total.toLocaleString() }}</dd>
-                  </template>
-                  <template v-if="nodeinfoData.usage.users?.activeMonth != null">
-                    <dt class="text-gray-500 dark:text-gray-400 print:text-gray-500">Active (Monthly)</dt>
-                    <dd>{{ nodeinfoData.usage.users.activeMonth.toLocaleString() }}</dd>
-                  </template>
-                  <template v-if="nodeinfoData.usage.users?.activeHalfyear != null">
-                    <dt class="text-gray-500 dark:text-gray-400 print:text-gray-500">Active (6 Months)</dt>
-                    <dd>{{ nodeinfoData.usage.users.activeHalfyear.toLocaleString() }}</dd>
-                  </template>
-                  <template v-if="nodeinfoData.usage.localPosts != null">
-                    <dt class="text-gray-500 dark:text-gray-400 print:text-gray-500">Local Posts</dt>
-                    <dd>{{ nodeinfoData.usage.localPosts.toLocaleString() }}</dd>
-                  </template>
-                </dl>
+                <DataItemList>
+                  <DataItem label="Total Users" v-if="nodeinfoData.usage.users?.total != null">
+                    {{ nodeinfoData.usage.users.total.toLocaleString() }}
+                  </DataItem>
+                  <DataItem label="Active (Monthly)" v-if="nodeinfoData.usage.users?.activeMonth != null">
+                    {{ nodeinfoData.usage.users.activeMonth.toLocaleString() }}
+                  </DataItem>
+                  <DataItem label="Active (6 Months)" v-if="nodeinfoData.usage.users?.activeHalfyear != null">
+                    {{ nodeinfoData.usage.users.activeHalfyear.toLocaleString() }}
+                  </DataItem>
+                  <DataItem label="Local Posts" v-if="nodeinfoData.usage.localPosts != null">
+                    {{ nodeinfoData.usage.localPosts.toLocaleString() }}
+                  </DataItem>
+                </DataItemList>
               </div>
             </div>
 
@@ -258,24 +261,19 @@ function printReport() {
 
           <!-- ── 2. Authorization ──────────────────────────────────────────── -->
           <section>
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white print:text-black mb-1">
-              2. Authorization
-            </h2>
-            <hr class="border-gray-200 dark:border-gray-700 print:border-gray-300 mb-4" />
+            <SectionHeading>2. Authorization</SectionHeading>
 
             <!-- Summary line -->
-            <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm mb-6">
-              <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Method</dt>
-              <dd>
+            <DataItemList>
+              <DataItem label="Method">
                 <span v-if="server.auth?.authType === 'oauth2'" class="font-medium">OAuth 2.0</span>
                 <span v-else-if="server.auth?.authType === 'bearer'" class="font-medium">Bearer Token</span>
                 <span v-else class="text-gray-400">Not configured</span>
-              </dd>
-              <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Discovery Method</dt>
-              <dd>
+              </DataItem>
+              <DataItem label="Discovery Method">
                 {{ server.auth?.oauth2?.authServerDiscovery?.discoveryMethod ?? 'N/A' }}
-              </dd>
-            </dl>
+              </DataItem>
+            </DataItemList>
 
             <!-- Bearer note -->
             <p v-if="server.auth?.authType === 'bearer'"
@@ -285,144 +283,110 @@ function printReport() {
 
             <!-- OAuth2 subsections -->
             <template v-else-if="server.auth?.authType === 'oauth2' && oauth2">
-
               <!-- 2.1 Authorization Server -->
               <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 print:text-gray-700 mt-4 mb-2">
                 2.1 Authorization Server
               </h3>
-              <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Origin</dt>
-                <dd class="break-all">{{ oauth2.authServerOrigin }}</dd>
+              <DataItemList>
+                <DataItem label="Origin">{{ oauth2.authServerOrigin }}</DataItem>
 
                 <template v-if="authServerMeta">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Issuer</dt>
-                  <dd class="break-all">{{ authServerMeta.issuer }}</dd>
-
-                  <template v-if="authServerMeta.authorization_endpoint">
-                    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Authorization Endpoint
-                    </dt>
-                    <dd class="break-all">{{ authServerMeta.authorization_endpoint }}</dd>
-                  </template>
-
-                  <template v-if="authServerMeta.token_endpoint">
-                    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Token Endpoint</dt>
-                    <dd class="break-all">{{ authServerMeta.token_endpoint }}</dd>
-                  </template>
-
-                  <template v-if="authServerMeta.scopes_supported?.length">
-                    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Scopes Supported</dt>
-                    <dd>{{ authServerMeta.scopes_supported.join(', ') }}</dd>
-                  </template>
-
-                  <template v-if="authServerMeta.grant_types_supported?.length">
-                    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Grant Types</dt>
-                    <dd>{{ authServerMeta.grant_types_supported.join(', ') }}</dd>
-                  </template>
-
-                  <template v-if="authServerMeta.response_types_supported?.length">
-                    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Response Types</dt>
-                    <dd>{{ authServerMeta.response_types_supported.join(', ') }}</dd>
-                  </template>
-
-                  <template v-if="authServerMeta.token_endpoint_auth_methods_supported?.length">
-                    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Token Auth Methods</dt>
-                    <dd>{{ authServerMeta.token_endpoint_auth_methods_supported.join(', ') }}</dd>
-                  </template>
+                  <DataItem label="Issuer">{{ authServerMeta.issuer }}</DataItem>
+                  <DataItem label="Authorization Endpoint" v-if="authServerMeta.authorization_endpoint">
+                    {{ authServerMeta.authorization_endpoint }}
+                  </DataItem>
+                  <DataItem label="Token Endpoint" v-if="authServerMeta.token_endpoint">
+                    {{ authServerMeta.token_endpoint }}
+                  </DataItem>
+                  <DataItem label="Scopes Supported" v-if="authServerMeta.scopes_supported?.length">
+                    {{ authServerMeta.scopes_supported.join(', ') }}
+                  </DataItem>
+                  <DataItem label="Grant Types" v-if="authServerMeta.grant_types_supported?.length">
+                    {{ authServerMeta.grant_types_supported.join(', ') }}
+                  </DataItem>
+                  <DataItem label="Response Types" v-if="authServerMeta.response_types_supported?.length">
+                    {{ authServerMeta.response_types_supported.join(', ') }}
+                  </DataItem>
+                  <DataItem label="Token Auth Methods"
+                    v-if="authServerMeta.token_endpoint_auth_methods_supported?.length">
+                    {{ authServerMeta.token_endpoint_auth_methods_supported.join(', ') }}
+                  </DataItem>
                 </template>
-                <template v-else>
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Metadata</dt>
-                  <dd class="italic text-gray-400">Not yet discovered</dd>
-                </template>
-              </dl>
+                <DataItem label="Metadata" italic v-else>Not yet discovered</DataItem>
+              </DataItemList>
 
               <!-- 2.2 Client Registration -->
               <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 print:text-gray-700 mt-6 mb-2">
                 2.2 Client Registration
               </h3>
-              <dl v-if="clientReg" class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Client ID</dt>
-                <dd class="font-mono text-xs break-all">{{ clientReg.client_id }}</dd>
-
-                <template v-if="clientReg.client_name ?? clientReg.name">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Client Name</dt>
-                  <dd>{{ clientReg.client_name ?? clientReg.name }}</dd>
-                </template>
-
-                <template v-if="clientReg.redirect_uris?.length">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Redirect URIs</dt>
-                  <dd class="break-all">{{ clientReg.redirect_uris.join(', ') }}</dd>
-                </template>
-
-                <template v-if="clientReg.scope">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Scope</dt>
-                  <dd>{{ clientReg.scope }}</dd>
-                </template>
-
-                <template v-if="oauth2.clientRegistration?.registrationMethod">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Registration Method</dt>
-                  <dd>{{ oauth2.clientRegistration.registrationMethod }}</dd>
-                </template>
-              </dl>
+              <DataItemList v-if="clientReg">
+                <DataItem label="Client ID">
+                  {{ clientReg.client_id }}
+                </DataItem>
+                <DataItem label="Client Name" v-if="clientReg.client_name ?? clientReg.name">
+                  {{ clientReg.client_name ?? clientReg.name }}
+                </DataItem>
+                <DataItem label="Redirect URIs" v-if="clientReg.redirect_uris?.length">
+                  {{ clientReg.redirect_uris.join(', ') }}
+                </DataItem>
+                <DataItem label="Scope" v-if="clientReg.scope">
+                  {{ clientReg.scope }}
+                </DataItem>
+                <DataItem label="Registration Method" v-if="oauth2.clientRegistration?.registrationMethod">
+                  {{ oauth2.clientRegistration.registrationMethod }}
+                </DataItem>
+              </DataItemList>
               <p v-else class="text-sm text-gray-400 dark:text-gray-500 italic">Client not yet registered.</p>
 
               <!-- 2.3 Access Token -->
               <h3 class="text-base font-semibold text-gray-700 dark:text-gray-300 print:text-gray-700 mt-6 mb-2">
                 2.3 Access Token
               </h3>
-              <dl v-if="tokenPayload" class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-                <template v-if="tokenPayload.token_type">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Token Type</dt>
-                  <dd>{{ tokenPayload.token_type }}</dd>
-                </template>
-                <template v-if="tokenPayload.scope">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Scope</dt>
-                  <dd>{{ tokenPayload.scope }}</dd>
-                </template>
-                <template v-if="tokenPayload.expires_in != null">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Expires In</dt>
-                  <dd>{{ tokenPayload.expires_in }} s</dd>
-                </template>
-              </dl>
+              <DataItemList v-if="tokenPayload">
+                <DataItem label="Token Type" v-if="tokenPayload.token_type">
+                  {{ tokenPayload.token_type }}
+                </DataItem>
+                <DataItem label="Scope" v-if="tokenPayload.scope">
+                  {{ tokenPayload.scope }}
+                </DataItem>
+                <DataItem label="Expires In" v-if="tokenPayload.expires_in != null">
+                  {{ tokenPayload.expires_in }} s
+                </DataItem>
+              </DataItemList>
               <p v-else class="text-sm text-gray-400 dark:text-gray-500 italic">No access token acquired yet.</p>
-
             </template>
           </section>
 
           <!-- ── Actor Information ───────────────────────────────────────────── -->
           <section>
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white print:text-black mb-1">
-              3. ActivityPub Actor
-            </h2>
-            <hr class="border-gray-200 dark:border-gray-700 print:border-gray-300 mb-4" />
+            <SectionHeading>3. ActivityPub Actor</SectionHeading>
 
             <p v-if="!actor" class="text-sm text-gray-400 dark:text-gray-500 italic">
               No ActivityPub actor information has been recorded for this server.
             </p>
 
             <template v-else>
-              <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">URI</dt>
-                <dd>{{ actor.profile.id }}</dd>
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Discovery Method</dt>
-                <dd>{{ actor.discovery.method ?? "N/A" }}</dd>
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Endpoints</dt>
-                <dd>{{ actor.profile.endpoints ? Object.keys(actor.profile.endpoints).join(" ") : "N/A" }}</dd>
-                <template v-if="actor.profile.streams">
-                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Streams</dt>
-                  <dd>{{ Object.keys(actor.profile.streams).join(" ") }}</dd>
-                </template>
-              </dl>
+              <DataItemList>
+                <DataItem label="URI">
+                  {{ actor.profile.id }}
+                </DataItem>
+                <DataItem label="Discovery Method">
+                  {{ actor.discovery.method ?? "N/A" }}
+                </DataItem>
+                <DataItem label="Endpoints">
+                  {{ actor.profile.endpoints ? Object.keys(actor.profile.endpoints).join(" ") : "N/A" }}
+                </DataItem>
+                <DataItem label="Streams" v-if="actor.profile.streams">
+                  {{ Object.keys(actor.profile.streams).join(" ") }}
+                </DataItem>
+              </DataItemList>
             </template>
           </section>
 
 
           <!-- ── 4. Test Results ───────────────────────────────────────────── -->
           <section>
-            <h2 class="text-xl font-semibold text-gray-800 dark:text-white print:text-black mb-1">
-              4. Test Results
-            </h2>
-            <hr class="border-gray-200 dark:border-gray-700 print:border-gray-300 mb-4" />
-
+            <SectionHeading>4. Test Results</SectionHeading>
 
             <p v-if="!testResults" class="text-sm text-gray-400 dark:text-gray-500 italic">
               No test results have been recorded for this server yet.
@@ -431,16 +395,20 @@ function printReport() {
 
             <template v-else>
               <!-- Run metadata -->
-              <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm mb-5">
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Suite</dt>
-                <dd>{{ testResults.suiteName }}</dd>
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Run ID</dt>
-                <dd class="font-mono text-xs">{{ testResults.runId }}</dd>
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Started</dt>
-                <dd>{{ formatDate(testResults.startedAt) }}</dd>
-                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Duration</dt>
-                <dd>{{ formatDuration(testResults.durationMs) }}</dd>
-              </dl>
+              <DataItemList>
+                <DataItem label="Suite">
+                  {{ testResults.suiteName }}
+                </DataItem>
+                <DataItem label="Run ID">
+                  {{ testResults.runId }}
+                </DataItem>
+                <DataItem label="Started">
+                  {{ formatDate(testResults.startedAt) }}
+                </DataItem>
+                <DataItem label="Duration">
+                  {{ formatDuration(testResults.durationMs) }}
+                </DataItem>
+              </DataItemList>
 
               <!-- Summary row -->
               <div
