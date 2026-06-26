@@ -3,7 +3,7 @@ import type {
   TestCaseDefinition,
   TestSuiteDefinition,
 } from "@/testing/core/types"
-import { resolveHandle } from "@/services/webfingerService"
+import { resolveHandleEx } from "@/services/webfingerService"
 import {
   collectionIsEmpty,
   getCollectionItemUris,
@@ -109,7 +109,7 @@ const tests: TestCaseDefinition[] = [
         )
       }
 
-      const resolvedActorUri = await resolveHandle(handle)
+      const [resolvedActorUri, webfingerExchange] = await resolveHandleEx(handle)
       if (!resolvedActorUri) {
         return tools.fail(`WebFinger could not resolve actor URI for ${handle}`)
       }
@@ -125,6 +125,7 @@ const tests: TestCaseDefinition[] = [
         reason: `WebFinger resolved actor URI correctly for ${handle}`,
         assertions: [],
         contextUpdates: { resolvedActorUri },
+        exchange: webfingerExchange,
       }
     },
   },
