@@ -9,9 +9,12 @@ function handleDelete(server: ResourceServerMetadata) {
   }
 }
 
-function formatAuthStatus(status: string): string {
-  switch (status) {
+function formatAuthStatus(server: ResourceServerMetadata): string {
+  switch (server.auth?.authStatus) {
     case 'authorized':
+      if (isTokenExpired(server)) {
+        return 'Token expired'
+      }
       return 'Authorized'
     case 'token-expired':
       return 'Token expired'
@@ -45,6 +48,18 @@ function isTokenExpired(server: ResourceServerMetadata): boolean {
 
   return remainingMs <= 0
 
+}
+
+function authStatusClass(server: ResourceServerMetadata): string {
+  if (server.auth?.authStatus === 'token-expired' || isTokenExpired(server)) {
+    return 'text-red-700 dark:text-red-300'
+  }
+
+  if (server.auth?.authStatus === 'authorized') {
+    return 'text-green-600 dark:text-green-400 font-medium'
+  }
+
+  return 'text-orange-600 dark:text-orange-400 font-medium'
 }
 
 </script>
@@ -95,8 +110,8 @@ function isTokenExpired(server: ResourceServerMetadata): boolean {
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-700 dark:text-gray-300">
             {{ server.auth?.authType === 'oauth2' ? 'OAuth2' : 'Bearer' }}
           </td>
-          <td class="px-6 py-4 whitespace-nowrap text-sm" :class="server.auth?.authStatus === 'authorized' ? 'text-green-600 dark:text-green-400 font-medium' : server.auth?.authStatus === 'token-expired' || isTokenExpired(server) ? 'text-gray-700 dark:text-gray-300' : 'text-orange-600 dark:text-orange-400 font-medium'">
-            {{ formatAuthStatus(server.auth?.authStatus!) }}
+          <td class="px-6 py-4 whitespace-nowrap text-sm" :class="authStatusClass(server)">
+            {{ formatAuthStatus(server) }}
           </td>
           <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
             {{ formatLastUsed(server.lastUsed) }}
