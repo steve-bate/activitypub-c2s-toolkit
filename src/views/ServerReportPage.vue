@@ -60,6 +60,10 @@ const tokenPayload = computed(() => {
     | undefined
 })
 
+// ── Actor Information ─────────────────────────────────────────────────────────
+
+const actor = computed(() => server.value?.actor)
+
 // ── Test results ──────────────────────────────────────────────────────────────
 
 const testResults = computed(() => server.value?.testing?.results ?? null)
@@ -111,10 +115,9 @@ function printReport() {
     <template v-else>
       <!-- Print button (screen only) -->
       <div class="max-w-3xl mx-auto px-6 mb-4 flex justify-end print:hidden">
-        <button
-          @click="printReport"
-          class="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm"
-        >
+        <button @click="printReport"
+          class="inline-flex items-center gap-2 px-4 py-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-md text-sm text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors shadow-sm">
+          <!-- Printer Icon -->
           <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
               d="M17 17h2a2 2 0 002-2v-4a2 2 0 00-2-2H5a2 2 0 00-2 2v4a2 2 0 002 2h2m2 4h6a2 2 0 002-2v-4a2 2 0 00-2-2H9a2 2 0 00-2 2v4a2 2 0 002 2zm8-12V5a2 2 0 00-2-2H9a2 2 0 00-2 2v4h10z" />
@@ -126,14 +129,13 @@ function printReport() {
       <!-- ══════════════════════════════════════════════════════════════════ -->
       <!-- Report document                                                    -->
       <!-- ══════════════════════════════════════════════════════════════════ -->
-      <article
-        class="max-w-3xl mx-auto bg-white dark:bg-gray-800 shadow-sm print:shadow-none rounded-lg overflow-hidden
-               text-gray-900 dark:text-gray-100 print:text-black"
-      >
+      <article class="max-w-3xl mx-auto bg-white dark:bg-gray-800 shadow-sm print:shadow-none rounded-lg overflow-hidden
+               text-gray-900 dark:text-gray-100 print:text-black">
 
         <!-- ── Cover / Header ──────────────────────────────────────────────── -->
         <header class="px-10 pt-10 pb-6 border-b border-gray-200 dark:border-gray-700 print:border-gray-300">
-          <p class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 print:text-gray-500 mb-2">
+          <p
+            class="text-xs font-semibold uppercase tracking-widest text-gray-400 dark:text-gray-500 print:text-gray-500 mb-2">
             ActivityPub C2S Toolkit
           </p>
           <h1 class="text-3xl font-bold text-gray-900 dark:text-white print:text-black">
@@ -143,7 +145,7 @@ function printReport() {
             {{ server.origin ?? server.auth?.oauth2?.authServerOrigin }}
           </p>
           <p v-if="server.notes" class="mt-2 text-sm text-gray-600 dark:text-gray-400 print:text-gray-600">
-            {{ server.notes }} 
+            {{ server.notes }}
           </p>
           <p class="mt-4 text-sm text-gray-400 dark:text-gray-500 print:text-gray-500">
             Generated {{ reportDate }}
@@ -165,7 +167,8 @@ function printReport() {
               <!-- Node identity -->
               <div v-if="nodeName || nodeDescription" class="mb-2">
                 <p v-if="nodeName" class="text-base font-medium">{{ nodeName }}</p>
-                <p v-if="nodeDescription" class="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600 mt-0.5">{{ nodeDescription }}</p>
+                <p v-if="nodeDescription" class="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600 mt-0.5">{{
+                  nodeDescription }}</p>
               </div>
 
               <!-- Key/value grid -->
@@ -173,14 +176,15 @@ function printReport() {
                 <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Software</dt>
                 <dd>
                   {{ nodeinfoData.software?.name ?? '—' }}
-                  <span v-if="nodeinfoData.software?.version" class="text-gray-500 dark:text-gray-400"> v{{ nodeinfoData.software.version }}</span>
+                  <span v-if="nodeinfoData.software?.version" class="text-gray-500 dark:text-gray-400"> v{{
+                    nodeinfoData.software.version }}</span>
                 </dd>
 
                 <template v-if="nodeinfoData.software?.repository">
                   <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Repository</dt>
                   <dd>
                     <a :href="nodeinfoData.software.repository" target="_blank" rel="noopener noreferrer"
-                       class="text-blue-600 dark:text-blue-400 print:text-blue-700 hover:underline break-all">
+                      class="text-blue-600 dark:text-blue-400 print:text-blue-700 hover:underline break-all">
                       {{ nodeinfoData.software.repository }}
                     </a>
                   </dd>
@@ -190,7 +194,7 @@ function printReport() {
                   <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Homepage</dt>
                   <dd>
                     <a :href="nodeinfoData.software.homepage" target="_blank" rel="noopener noreferrer"
-                       class="text-blue-600 dark:text-blue-400 print:text-blue-700 hover:underline break-all">
+                      class="text-blue-600 dark:text-blue-400 print:text-blue-700 hover:underline break-all">
                       {{ nodeinfoData.software.homepage }}
                     </a>
                   </dd>
@@ -208,10 +212,8 @@ function printReport() {
               </dl>
 
               <!-- Services -->
-              <div
-                v-if="nodeinfoData.services?.inbound?.length || nodeinfoData.services?.outbound?.length"
-                class="mt-2"
-              >
+              <div v-if="nodeinfoData.services?.inbound?.length || nodeinfoData.services?.outbound?.length"
+                class="mt-2">
                 <p class="text-sm font-medium text-gray-500 dark:text-gray-400 print:text-gray-500 mb-1">Services</p>
                 <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-1 text-sm">
                   <template v-if="nodeinfoData.services?.inbound?.length">
@@ -269,18 +271,15 @@ function printReport() {
                 <span v-else-if="server.auth?.authType === 'bearer'" class="font-medium">Bearer Token</span>
                 <span v-else class="text-gray-400">Not configured</span>
               </dd>
-              <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Status</dt>
+              <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Discovery Method</dt>
               <dd>
-                <span
-                  v-if="server.auth?.authStatus === 'authorized'"
-                  class="font-medium text-green-700 dark:text-green-400 print:text-green-700"
-                >Authorized</span>
-                <span v-else class="text-gray-500">{{ server.auth?.authStatus ?? 'Unknown' }}</span>
+                {{ server.auth?.oauth2?.authServerDiscovery?.discoveryMethod ?? 'N/A' }}
               </dd>
             </dl>
 
             <!-- Bearer note -->
-            <p v-if="server.auth?.authType === 'bearer'" class="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600 italic">
+            <p v-if="server.auth?.authType === 'bearer'"
+              class="text-sm text-gray-600 dark:text-gray-400 print:text-gray-600 italic">
               A Bearer token is configured. The token value is omitted from this report.
             </p>
 
@@ -300,7 +299,8 @@ function printReport() {
                   <dd class="break-all">{{ authServerMeta.issuer }}</dd>
 
                   <template v-if="authServerMeta.authorization_endpoint">
-                    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Authorization Endpoint</dt>
+                    <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Authorization Endpoint
+                    </dt>
                     <dd class="break-all">{{ authServerMeta.authorization_endpoint }}</dd>
                   </template>
 
@@ -388,12 +388,41 @@ function printReport() {
             </template>
           </section>
 
-          <!-- ── 3. Test Results ───────────────────────────────────────────── -->
+          <!-- ── Actor Information ───────────────────────────────────────────── -->
           <section>
             <h2 class="text-xl font-semibold text-gray-800 dark:text-white print:text-black mb-1">
-              3. Test Results
+              3. ActivityPub Actor
             </h2>
             <hr class="border-gray-200 dark:border-gray-700 print:border-gray-300 mb-4" />
+
+            <p v-if="!actor" class="text-sm text-gray-400 dark:text-gray-500 italic">
+              No ActivityPub actor information has been recorded for this server.
+            </p>
+
+            <template v-else>
+              <dl class="grid grid-cols-[max-content_1fr] gap-x-6 gap-y-2 text-sm">
+                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">URI</dt>
+                <dd>{{ actor.profile.id }}</dd>
+                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Discovery Method</dt>
+                <dd>{{ actor.discovery.method ?? "N/A" }}</dd>
+                <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Endpoints</dt>
+                <dd>{{ actor.profile.endpoints ? Object.keys(actor.profile.endpoints).join(" ") : "N/A" }}</dd>
+                <template v-if="actor.profile.streams">
+                  <dt class="font-medium text-gray-500 dark:text-gray-400 print:text-gray-500">Streams</dt>
+                  <dd>{{ Object.keys(actor.profile.streams).join(" ") }}</dd>
+                </template>
+              </dl>
+            </template>
+          </section>
+
+
+          <!-- ── 4. Test Results ───────────────────────────────────────────── -->
+          <section>
+            <h2 class="text-xl font-semibold text-gray-800 dark:text-white print:text-black mb-1">
+              4. Test Results
+            </h2>
+            <hr class="border-gray-200 dark:border-gray-700 print:border-gray-300 mb-4" />
+
 
             <p v-if="!testResults" class="text-sm text-gray-400 dark:text-gray-500 italic">
               No test results have been recorded for this server yet.
@@ -414,20 +443,23 @@ function printReport() {
               </dl>
 
               <!-- Summary row -->
-              <div class="flex flex-wrap gap-4 text-sm font-medium mb-5 py-3 border-y border-gray-200 dark:border-gray-700 print:border-gray-300">
+              <div
+                class="flex flex-wrap gap-4 text-sm font-medium mb-5 py-3 border-y border-gray-200 dark:border-gray-700 print:border-gray-300">
                 <span class="text-green-700 dark:text-green-400 print:text-green-700">
                   ✓ {{ testResults.summary.pass }} passed
                 </span>
                 <span v-if="testResults.summary.fail > 0" class="text-red-700 dark:text-red-400 print:text-red-700">
                   ✗ {{ testResults.summary.fail }} failed
                 </span>
-                <span v-if="testResults.summary.error > 0" class="text-orange-700 dark:text-orange-400 print:text-orange-700">
+                <span v-if="testResults.summary.error > 0"
+                  class="text-orange-700 dark:text-orange-400 print:text-orange-700">
                   ! {{ testResults.summary.error }} error{{ testResults.summary.error !== 1 ? 's' : '' }}
                 </span>
                 <span v-if="testResults.summary.skip > 0" class="text-gray-500 dark:text-gray-400">
                   – {{ testResults.summary.skip }} skipped
                 </span>
-                <span v-if="testResults.summary.inconclusive > 0" class="text-yellow-700 dark:text-yellow-400 print:text-yellow-700">
+                <span v-if="testResults.summary.inconclusive > 0"
+                  class="text-yellow-700 dark:text-yellow-400 print:text-yellow-700">
                   ? {{ testResults.summary.inconclusive }} inconclusive
                 </span>
                 <span class="text-gray-400 dark:text-gray-500 ml-auto">
@@ -438,18 +470,16 @@ function printReport() {
               <!-- Per-test table -->
               <table class="w-full text-sm border-collapse">
                 <thead>
-                  <tr class="text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 print:text-gray-500">
+                  <tr
+                    class="text-left text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500 print:text-gray-500">
                     <th class="pb-2 pr-2 font-semibold" style="width:2ch"></th>
                     <th class="pb-2 pr-4 font-semibold">Test Case</th>
                     <th class="pb-2 text-right font-semibold">Duration</th>
                   </tr>
                 </thead>
                 <tbody>
-                  <tr
-                    v-for="result in testResults.results"
-                    :key="result.id"
-                    class="border-t border-gray-100 dark:border-gray-700 print:border-gray-200"
-                  >
+                  <tr v-for="result in testResults.results" :key="result.id"
+                    class="border-t border-gray-100 dark:border-gray-700 print:border-gray-200">
                     <td class="py-1.5 pr-2 text-center font-mono font-bold" :class="STATUS_CLASS[result.status]">
                       {{ STATUS_SYMBOL[result.status] }}
                     </td>
@@ -466,7 +496,8 @@ function printReport() {
         </div>
 
         <!-- ── Footer ──────────────────────────────────────────────────────── -->
-        <footer class="px-10 py-5 border-t border-gray-200 dark:border-gray-700 print:border-gray-300 text-xs text-gray-400 dark:text-gray-500 print:text-gray-400 flex justify-between">
+        <footer
+          class="px-10 py-5 border-t border-gray-200 dark:border-gray-700 print:border-gray-300 text-xs text-gray-400 dark:text-gray-500 print:text-gray-400 flex justify-between">
           <span>ActivityPub C2S Toolkit</span>
           <span>{{ reportDate }}</span>
         </footer>
@@ -478,13 +509,16 @@ function printReport() {
 
 <style>
 @media print {
+
   /* Hide the app header when printing */
   header.sticky {
     display: none !important;
   }
+
   body {
     background: white !important;
   }
+
   section {
     break-inside: avoid;
   }

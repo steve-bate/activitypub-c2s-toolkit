@@ -15,7 +15,7 @@
 import { HttpExchange, HttpRequestData, HttpResponseData } from "@/types/http"
 import { resolveHandle } from './webfingerService'
 
-export type AuthServerDiscoveryMethod = 'RFC8414' | 'RFC9728' | 'Mastodon' | 'Heuristic' | 'Manual'
+export type AuthServerDiscoveryMethod = 'RFC8414' | 'RFC9728' | 'Mastodon' | 'Inferred' | 'Manual'
 
 /** RFC 9728 Protected Resource Metadata */
 export interface ProtectedResourceMetadata {
@@ -489,7 +489,7 @@ async function discoverProtectedResourceAndAS(resourceUrl: string): Promise<Reso
           }
 
           if (inboxResp.ok) {
-            // Heuristic: assume inbox origin == AS origin
+            // Inferred: assume inbox origin == AS origin
             const inboxOrigin = originOf(inboxUrl)
             console.debug(`[discoverProtectedResourceAndAS] Inbox responded 2xx, using inbox origin as AS: ${inboxOrigin}`)
 
@@ -729,7 +729,7 @@ export async function getAuthorizationServerMetadata(
       authServerOrigin: fallbackOrigin,
       authorizationServerMetadata: asMetadata.metadata,
       protectedResourceMetadata: rsResult.protectedResourceMetadata,
-      discoveryMethod: rsResult.authServerOrigin ? 'RFC9728' : 'Heuristic',
+      discoveryMethod: rsResult.authServerOrigin ? 'RFC9728' : 'Inferred',
       exchange: asMetadata.exchange
     }
   }

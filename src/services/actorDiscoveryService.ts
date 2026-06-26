@@ -30,6 +30,7 @@ export interface ActorProfile {
     proxyUrl?: string; // Custom property for proxying requests through the server
     uploadMedia?: string;
   };
+  streams: Record<string, string>;
 }
 
 export type ActorDiscoveryMethod = 'token_response' | 'introspection' | 'verify_credentials' | 'jwt' | "user";
