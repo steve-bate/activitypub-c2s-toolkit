@@ -1,18 +1,19 @@
 import { createRouter, createWebHistory } from "vue-router";
-import JsonBrowserPage from "@/views/JsonBrowserPage.vue";
-import ServersPage from "@/views/ServersPage.vue";
-import ServerMetadataPage from "@/views/ServerMetadataPage.vue";
-import ServerOAuth2Page from "@/views/ServerOAuth2Page.vue";
-import AddServerPage from "@/views/AddServerPage.vue";
-import OAuthCallbackPage from "@/views/OAuthCallbackPage.vue";
-import TemplatesPage from "@/views/TemplatesPage.vue";
-import TemplateEditorPage from "@/views/TemplateEditorPage.vue";
-import FollowPage from "@/views/FollowPage.vue";
-import UploadMediaPage from "@/views/UploadMediaPage.vue";
-import SettingsPage from "@/views/SettingsPage.vue";
-import ObjectActionStatusPage from "@/views/ObjectActionStatusPage.vue";
-import ServerTestPage from "../views/ServerTestPage.vue";
-import ServerReportPage from "@/views/ServerReportPage.vue";
+
+const ServersPage = () => import('@/views/ServersPage.vue')
+const ServerMetadataPage = () => import('@/views/ServerMetadataPage.vue')
+const ServerOAuth2Page = () => import('@/views/ServerOAuth2Page.vue')
+const AddServerPage = () => import('@/views/AddServerPage.vue')
+const OAuthCallbackPage = () => import('@/views/OAuthCallbackPage.vue')
+const FollowPage = () => import('@/views/FollowPage.vue')
+const UploadMediaPage = () => import('@/views/UploadMediaPage.vue')
+const SettingsPage = () => import('@/views/SettingsPage.vue')
+const ObjectActionStatusPage = () => import('@/views/ObjectActionStatusPage.vue')
+const ServerTestPage = () => import('../views/ServerTestPage.vue')
+const ServerReportPage = () => import('@/views/ServerReportPage.vue')
+const TemplatesPage = () => import('@/views/TemplatesPage.vue')
+const TemplateEditorPage = () => import('@/views/TemplateEditorPage.vue')
+const JsonBrowserPage = () => import('@/views/JsonBrowserPage.vue')
 
 const router = createRouter({
   history: createWebHistory(import.meta.env.BASE_URL),
