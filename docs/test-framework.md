@@ -1,4 +1,4 @@
-# Server Test Framework
+# C2S Server Test Framework
 
 The toolkit provides an embedded, extensible test framework for testing C2S server behaviors.
 
@@ -29,6 +29,7 @@ Tests are currently defined in code. in the `/src/testing/suites` directory.To d
 Individual tests implement the `TestCaseDefinition` type.  See the `coreClientTests.ts` file for examples. Several common predefined assertions are available when writing tests. The following table describes the current built-in assertions.
 
 | Assertion Kind | Description |
+|----|----|
 | `status` | Requires HTTP response status |
 | `headerMatch` | Requires headers (patterns are supported) |
 | `jsonPathExists` | Requires specific JSON properties in response |

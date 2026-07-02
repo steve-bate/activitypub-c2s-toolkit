@@ -34,7 +34,7 @@ The form-based editor uses [FormKit](https://formkit.com) with extensions for po
 |---|---|
 | `split` | Splits text into an array |
 | `datetime-utc` | Formats a timestamp to be AS2-compatible (using UTC time zone) |
-| `template`` | Transform a value based on a [HandleBars](https://handlebarsjs.com/) template | 
+| `template` | Transform a value based on a [HandleBars](https://handlebarsjs.com/) template | 
 
 Multiple transformations can be applied to a value. For example, a `tags` string can be split on newlines and then provided to a template processor to create ActivityPub `HashTag` objects.
 

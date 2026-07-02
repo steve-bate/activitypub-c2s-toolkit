@@ -21,8 +21,8 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 - JSON browser for inspecting ActivityPub objects
 - [Media Upload Support](#media-upload-support)
 - [Embedded automated testing framework](docs/test-framework.md)
-- [Server capability reports with test results](#server-capability-reports)
-- [Server capabilities data export](#server-capabilities-data-export)
+- [Server capability reports with test results](docs/server-reporting.md)
+- [Server capabilities data export](docs/server-reporting.md#server-capabilities-data-export)
 - [Resource Posting Tools](docs/resource-templates.md)
     - [Schema-driven ActivityPub resource editor](docs/resource-templates.md#form-based-template-editor)
     - [JSON template-based resource definition](docs/resource-templates.md#json-template-editor)
@@ -31,14 +31,6 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 ## Media Upload Support
 
 TODO - reference AP wiki page. Discuss issues with vague "spec"
-
-## Server Capability Reports
-
-A printable report describing capabilities and test results can be generated for a server. To generate a report, use the "Server Reports" option in the server menu.
-
-## Server Capabilities Data Export
-
-The servers table has an "Export JSON" button that can export many details about a C2S server (capabilities, test results, etc.). This can be useful for custom reporting like server comparison tables.
 
 ## Screenshots
 
