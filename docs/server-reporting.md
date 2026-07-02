@@ -23,3 +23,6 @@ This section provides information the results of running the C2S Server tests fr
 ## Server Capabilities Data Export
 
 The servers table has an "Export JSON" button that can export many details about a C2S server (capabilities, test results, etc.). This can be useful for custom reporting like server comparison tables.
+
+----
+This feature has been partially supported by a grant from the NLnet Foundation.

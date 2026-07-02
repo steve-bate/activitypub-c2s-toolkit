@@ -61,3 +61,6 @@ The JSON template is [Handlebars](https://handlebarsjs.com/) template. A templat
 * Ability to create server tests based on a resource template.
 * Create a DSL to externalize form schemas to make it easier to define new ones.
 * Extend the sidecar server to support persisting schemas and templates rather than storing them in browser storage.
+
+----
+This feature has been partially supported by a grant from the NLnet Foundation.

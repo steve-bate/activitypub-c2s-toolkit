@@ -46,3 +46,6 @@ Individual tests implement the `TestCaseDefinition` type.  See the `coreClientTe
         * Expect JSON property values (patterns, dotted-notation).
         * Expect Text response pattern
 * Create a JSON-based test DSL
+
+----
+This feature has been partially supported by a grant from the NLnet Foundation.

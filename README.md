@@ -132,4 +132,5 @@ This project is licensed under the MIT License - see the [LICENSE](LICENSE) file
 - [OAuth 2.0 Protected Resource Metadata](https://www.ietf.org/archive/id/draft-ietf-oauth-resource-metadata-09.html) - IETF Draft
 - [IndieAuth](https://indieauth.spec.indieweb.org/) - IndieWeb OAuth 2.0 extension (defines `me` parameter)
 
-
+----
+This project has been partially supported by a grant from the NLnet Foundation.

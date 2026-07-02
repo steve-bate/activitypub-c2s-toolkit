@@ -59,3 +59,6 @@ Example `POST /diagnostics` JSON payload shape:
 ## Query parameters:
 
 - `body=true` — Include response body in output (default: `false`, omitted)
+
+----
+This feature has been partially supported by a grant from the NLnet Foundation.
