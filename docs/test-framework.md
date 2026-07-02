@@ -24,7 +24,16 @@ A test result may also include details about the HTTP request and response to he
 
 ## Defining Tests
 
-TBD (see source code for now)
+Tests are currently defined in code. in the `/src/testing/suites` directory.To define a new test suite, create a module in the suites directory with a `TestSuiteDefinition`. Import and add that module to the `suites/index.ts` file. 
+
+Individual tests implement the `TestCaseDefinition` type.  See the `coreClientTests.ts` file for examples. Several common predefined assertions are available when writing tests. The following table describes the current built-in assertions.
+
+| Assertion Kind | Description |
+| `status` | Requires HTTP response status |
+| `headerMatch` | Requires headers (patterns are supported) |
+| `jsonPathExists` | Requires specific JSON properties in response |
+| `jsonPathEquals` | Requires a specific JSON property value |
+
 
 ## Future Work
 
