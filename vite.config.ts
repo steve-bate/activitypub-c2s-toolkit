@@ -11,5 +11,14 @@ export default defineConfig({
   },
   server: {
     allowedHosts: ['localhost', 'apclient.stevebate.dev']
+  },
+  build: {
+    rollupOptions: {
+      onwarn(msg, handler) {
+        // Ignore misplaced pure-annotation warnings
+        if (msg.code === 'INVALID_ANNOTATION') return
+        handler(msg)
+      },
+    },
   }
 })
