@@ -30,7 +30,15 @@ A web-based development toolkit for testing and debugging ActivityPub servers th
 
 ## Media Upload Support
 
-TODO - reference AP wiki page. Discuss issues with vague "spec"
+This implements the [ActivityPub Media Upload](https://www.w3.org/wiki/SocialCG/ActivityPub/MediaUpload) wiki discussion. The description of the functionality is not completely clear so it may not work with some servers.
+
+## Client Data Metadata Document (CIMD)
+
+If a server requires [CIMD](https://client.dev/), you will need to serve the document from somewhere. There is a `client-metadata.json` file in this project that will be served when the project is run in development mode. It must be edited to match your client credentials.
+
+## Vite Allowed Hosts
+
+If you have issues with Vite and allowed host names, you can set the `VITE_ALLOWED_HOSTS` (comma-separated) to a list of authorized domain anmes. The default is localhost.
 
 ## Screenshots
 
