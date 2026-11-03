@@ -25,3 +25,4 @@ dist-sidecar
 *.njsproj
 *.sln
 *.sw?
+.env
